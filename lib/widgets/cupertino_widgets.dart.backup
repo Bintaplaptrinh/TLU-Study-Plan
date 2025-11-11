@@ -1,0 +1,648 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
+class AppSymbol {
+	const AppSymbol(this.cupertinoName, this.materialIcon);
+
+	final String cupertinoName;
+	final IconData materialIcon;
+}
+
+class AppIcons {
+	static const calendarToday =
+			AppSymbol('calendar', Icons.calendar_today_outlined);
+	static const calendarMonth =
+			AppSymbol('calendar.badge.clock', Icons.calendar_month);
+	static const exams = AppSymbol('doc.text.magnifyingglass', Icons.quiz);
+	static const settings = AppSymbol('gearshape', Icons.settings);
+	static const checkCircle =
+			AppSymbol('checkmark.circle.fill', Icons.check_circle);
+	static const downloadCloud =
+			AppSymbol('icloud.and.arrow.down', Icons.cloud_download);
+	static const check = AppSymbol('checkmark', Icons.check);
+	static const lock = AppSymbol('lock', Icons.lock_outlined);
+	static const notificationsOn =
+			AppSymbol('bell.badge', Icons.notifications_active);
+	static const notificationsOff =
+			AppSymbol('bell.slash', Icons.notifications_off);
+	static const warning =
+			AppSymbol('exclamationmark.triangle', Icons.warning);
+	static const sun = AppSymbol('sun.max', Icons.wb_sunny);
+	static const moon = AppSymbol('moon', Icons.dark_mode);
+	static const light = AppSymbol('sun.max', Icons.light_mode);
+	static const receipt = AppSymbol('doc.text', Icons.receipt_long);
+	static const chevronRight =
+			AppSymbol('chevron.forward', Icons.chevron_right);
+	static const bug = AppSymbol('ladybug', Icons.bug_report_outlined);
+	static const info = AppSymbol('info.circle', Icons.info_outline);
+	static const chevronDown =
+			AppSymbol('chevron.down', Icons.arrow_drop_down);
+	static const chevronLeft =
+			AppSymbol('chevron.left', Icons.chevron_left);
+	static const chevronRightSmall =
+			AppSymbol('chevron.right', Icons.chevron_right);
+	static const arrowDown = AppSymbol('arrow.down', Icons.arrow_downward);
+	static const copy = AppSymbol('doc.on.doc', Icons.copy);
+	static const delete = AppSymbol('trash', Icons.delete_outline);
+	static const refresh = AppSymbol('arrow.clockwise', Icons.refresh);
+	static const description =
+			AppSymbol('doc.plaintext', Icons.description_outlined);
+	static const badge = AppSymbol('person.text.rectangle', Icons.badge_outlined);
+	static const visibility = AppSymbol('eye', Icons.visibility_outlined);
+	static const visibilityOff =
+			AppSymbol('eye.slash', Icons.visibility_off_outlined);
+	static const school = AppSymbol('graduationcap', Icons.school_outlined);
+	static const location =
+			AppSymbol('mappin.and.ellipse', Icons.location_on_outlined);
+	static const bugFilled = AppSymbol('ladybug', Icons.bug_report);
+	static const warningAmber =
+			AppSymbol('exclamationmark.triangle', Icons.warning_amber);
+	static const error = AppSymbol('xmark.octagon', Icons.error_outline);
+	static const success =
+			AppSymbol('checkmark.circle', Icons.check_circle_outline);
+	static const today = AppSymbol('calendar', Icons.today);
+	static const calendar = AppSymbol('calendar', Icons.calendar_month);
+	static const settingsFill = AppSymbol('gearshape.fill', Icons.settings);
+	static const infoSmall = AppSymbol('info.circle', Icons.info_outline);
+}
+
+class AppIcon extends StatelessWidget {
+	const AppIcon({
+		super.key,
+		required this.symbol,
+		this.color,
+		this.size,
+		this.mode,
+	});
+
+	final AppSymbol symbol;
+	final Color? color;
+	final double? size;
+	final dynamic mode; // Placeholder for compatibility
+
+	@override
+	Widget build(BuildContext context) {
+		return Icon(
+			symbol.materialIcon,
+			color: color,
+			size: size,
+		);
+	}
+}
+
+class AppSwitch extends StatelessWidget {
+	const AppSwitch({
+		super.key,
+		required this.value,
+		required this.onChanged,
+		this.enabled = true,
+		this.color,
+	});
+
+	final bool value;
+	final ValueChanged<bool> onChanged;
+	final bool enabled;
+	final Color? color;
+
+	@override
+	Widget build(BuildContext context) {
+		return AdaptiveSwitch(
+			value: value,
+			onChanged: enabled ? onChanged : null,
+			activeColor: color,
+		);
+	}
+}
+
+class _LiquidGlassSwitch extends StatelessWidget {
+	const _LiquidGlassSwitch({
+		required this.value,
+		required this.onChanged,
+		this.color,
+	});
+
+	final bool value;
+	final ValueChanged<bool>? onChanged;
+	final Color? color;
+
+	@override
+	Widget build(BuildContext context) {
+		final activeColor = color ?? Theme.of(context).colorScheme.primary;
+		
+		return GestureDetector(
+			onTap: onChanged != null ? () => onChanged!(!value) : null,
+			child: AnimatedContainer(
+				duration: const Duration(milliseconds: 300),
+				curve: Curves.easeInOut,
+				width: 51,
+				height: 31,
+				decoration: BoxDecoration(
+					borderRadius: BorderRadius.circular(15.5),
+					boxShadow: [
+						if (value)
+							BoxShadow(
+								color: activeColor.withOpacity(0.3),
+								blurRadius: 8,
+								offset: const Offset(0, 2),
+							),
+					],
+				),
+				child: Stack(
+					children: [
+						// Background track with glassmorphism
+						ClipRRect(
+							borderRadius: BorderRadius.circular(15.5),
+							child: Stack(
+								children: [
+									BackdropFilter(
+										filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+										child: Container(),
+									),
+									Container(
+										decoration: BoxDecoration(
+											color: value ? activeColor.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+										),
+									),
+									Container(
+										decoration: BoxDecoration(
+											border: Border.all(
+												color: value 
+													? activeColor.withOpacity(0.3)
+													: Colors.grey.withOpacity(0.2),
+												width: 1,
+											),
+											borderRadius: BorderRadius.circular(15.5),
+											gradient: LinearGradient(
+												begin: Alignment.topLeft,
+												end: Alignment.bottomRight,
+												colors: [
+													Colors.white.withOpacity(0.2),
+													Colors.white.withOpacity(0.05),
+												],
+											),
+										),
+									),
+								],
+							),
+						),
+						// Thumb with glassmorphism
+						AnimatedPositioned(
+							duration: const Duration(milliseconds: 300),
+							curve: Curves.easeInOut,
+							left: value ? 20 : 0,
+							top: 0,
+							bottom: 0,
+							child: Center(
+								child: Container(
+									width: 31,
+									height: 31,
+									decoration: BoxDecoration(
+										shape: BoxShape.circle,
+										boxShadow: [
+											BoxShadow(
+												color: Colors.black.withOpacity(0.15),
+												blurRadius: 8,
+												offset: const Offset(0, 2),
+											),
+										],
+									),
+									child: ClipOval(
+										child: Stack(
+											children: [
+												BackdropFilter(
+													filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+													child: Container(),
+												),
+												Container(
+													decoration: BoxDecoration(
+														color: Colors.white.withOpacity(0.9),
+													),
+												),
+												Container(
+													decoration: BoxDecoration(
+														shape: BoxShape.circle,
+														border: Border.all(
+															color: Colors.white.withOpacity(0.5),
+															width: 1.5,
+														),
+														gradient: LinearGradient(
+															begin: Alignment.topLeft,
+															end: Alignment.bottomRight,
+															colors: [
+																Colors.white.withOpacity(0.4),
+																Colors.white.withOpacity(0.1),
+															],
+														),
+													),
+												),
+											],
+										),
+									),
+								),
+							),
+						),
+					],
+				),
+			),
+		);
+	}
+}
+
+enum AppButtonVariant { primary, secondary, text }
+
+class AppButton extends StatelessWidget {
+	const AppButton({
+		super.key,
+		required this.label,
+		required this.variant,
+		this.onPressed,
+		this.expand = false,
+		this.leadingIcon,
+		this.isLoading = false,
+		this.padding,
+	});
+
+	final String label;
+	final AppButtonVariant variant;
+	final VoidCallback? onPressed;
+	final bool expand;
+	final AppSymbol? leadingIcon;
+	final bool isLoading;
+	final EdgeInsetsGeometry? padding;
+
+	@override
+	Widget build(BuildContext context) {
+		Widget button;
+		if (_useCupertinoNative) {
+			button = Stack(
+				alignment: Alignment.center,
+				children: [
+					CNButton(
+						label: label,
+						onPressed: (onPressed == null || isLoading) ? null : onPressed,
+						style: _mapVariantToCupertinoStyle(variant),
+						shrinkWrap: !expand,
+					),
+					if (isLoading)
+						const Positioned.fill(
+							child: Center(
+								child: CupertinoActivityIndicator(),
+							),
+						),
+				],
+			);
+		} else {
+			button = _buildMaterialButton(context);
+		}
+
+		if (expand) {
+			button = SizedBox(width: double.infinity, child: button);
+		}
+
+		return Padding(
+			padding: padding ?? EdgeInsets.zero,
+			child: button,
+		);
+	}
+
+	Widget _buildMaterialButton(BuildContext context) {
+		if (_useLiquidGlass && variant == AppButtonVariant.primary) {
+			return _LiquidGlassButton(
+				label: label,
+				onPressed: onPressed,
+				leadingIcon: leadingIcon,
+				isLoading: isLoading,
+			);
+		}
+
+		final icon = leadingIcon;
+		switch (variant) {
+			case AppButtonVariant.primary:
+				if (icon != null) {
+					return FilledButton.icon(
+						onPressed: onPressed,
+						icon: Icon(icon.materialIcon),
+						label: Text(label),
+					);
+				}
+				return FilledButton(
+					onPressed: onPressed,
+					child: isLoading
+							? const SizedBox(
+									height: 20,
+									width: 20,
+									child: CircularProgressIndicator(strokeWidth: 2),
+								)
+							: Text(label),
+				);
+			case AppButtonVariant.secondary:
+				if (icon != null) {
+					return OutlinedButton.icon(
+						onPressed: onPressed,
+						icon: Icon(icon.materialIcon),
+						label: Text(label),
+					);
+				}
+				return OutlinedButton(
+					onPressed: onPressed,
+					child: Text(label),
+				);
+			case AppButtonVariant.text:
+				return TextButton(
+					onPressed: onPressed,
+					child: Text(label),
+				);
+		}
+	}
+}
+
+CNButtonStyle _mapVariantToCupertinoStyle(AppButtonVariant variant) {
+	switch (variant) {
+		case AppButtonVariant.primary:
+			return CNButtonStyle.filled;
+		case AppButtonVariant.secondary:
+			return CNButtonStyle.bordered;
+		case AppButtonVariant.text:
+			return CNButtonStyle.plain;
+	}
+}
+
+class _LiquidGlassButton extends StatelessWidget {
+	const _LiquidGlassButton({
+		required this.label,
+		required this.onPressed,
+		this.leadingIcon,
+		this.isLoading = false,
+	});
+
+	final String label;
+	final VoidCallback? onPressed;
+	final AppSymbol? leadingIcon;
+	final bool isLoading;
+
+	@override
+	Widget build(BuildContext context) {
+		final primaryColor = Theme.of(context).colorScheme.primary;
+		
+		return GestureDetector(
+			onTap: (onPressed != null && !isLoading) ? onPressed : null,
+			child: Container(
+				height: 52,
+				decoration: BoxDecoration(
+					borderRadius: BorderRadius.circular(26),
+					boxShadow: [
+						BoxShadow(
+							color: primaryColor.withOpacity(0.3),
+							blurRadius: 20,
+							offset: const Offset(0, 8),
+						),
+						BoxShadow(
+							color: Colors.black.withOpacity(0.1),
+							blurRadius: 10,
+							offset: const Offset(0, 4),
+						),
+					],
+				),
+				child: Stack(
+					children: [
+						// 1. ClipRRect for rounded corners
+						ClipRRect(
+							borderRadius: BorderRadius.circular(26),
+							child: Stack(
+								children: [
+									// 2. BackdropFilter for blur
+									BackdropFilter(
+										filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+										child: Container(
+											decoration: BoxDecoration(
+												color: Colors.transparent,
+											),
+										),
+									),
+									// 3. Glass tint layer
+									Container(
+										decoration: BoxDecoration(
+											color: primaryColor.withOpacity(0.15),
+										),
+									),
+									// 4. Border and liquid sheen gradient
+									Container(
+										decoration: BoxDecoration(
+											border: Border.all(
+												color: Colors.white.withOpacity(0.2),
+												width: 1.5,
+											),
+											borderRadius: BorderRadius.circular(26),
+											gradient: LinearGradient(
+												begin: Alignment.topLeft,
+												end: Alignment.bottomRight,
+												colors: [
+													Colors.white.withOpacity(0.3),
+													Colors.white.withOpacity(0.05),
+													Colors.white.withOpacity(0.1),
+												],
+												stops: const [0.0, 0.5, 1.0],
+											),
+										),
+									),
+								],
+							),
+						),
+						// 5. Center content
+						Center(
+							child: isLoading
+								? const SizedBox(
+										height: 24,
+										width: 24,
+										child: CircularProgressIndicator(
+											strokeWidth: 2.5,
+											valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+										),
+									)
+								: Row(
+										mainAxisSize: MainAxisSize.min,
+										mainAxisAlignment: MainAxisAlignment.center,
+										children: [
+											if (leadingIcon != null) ...[
+												Icon(
+													leadingIcon!.materialIcon,
+													color: Colors.white,
+													size: 20,
+												),
+												const SizedBox(width: 10),
+											],
+											Text(
+												label,
+												style: const TextStyle(
+													color: Colors.white,
+													fontSize: 16,
+													fontWeight: FontWeight.w600,
+													letterSpacing: 0.5,
+												),
+											),
+										],
+									),
+						),
+					],
+				),
+			),
+		);
+	}
+}
+
+class AppIconButton extends StatelessWidget {
+	const AppIconButton({
+		super.key,
+		required this.symbol,
+		this.onPressed,
+		this.tooltip,
+		this.color,
+		this.size = 24,
+	});
+
+	final AppSymbol symbol;
+	final VoidCallback? onPressed;
+	final String? tooltip;
+	final Color? color;
+	final double size;
+
+	@override
+	Widget build(BuildContext context) {
+		Widget button;
+		if (_useCupertinoNative) {
+			button = CNButton.icon(
+				icon: CNSymbol(
+					symbol.cupertinoName,
+					size: size,
+					color: color,
+				),
+				onPressed: onPressed,
+				enabled: onPressed != null,
+				style: CNButtonStyle.plain,
+			);
+		} else {
+			button = IconButton(
+				icon: Icon(
+					symbol.materialIcon,
+					color: color,
+				),
+				iconSize: size,
+				tooltip: tooltip,
+				onPressed: onPressed,
+			);
+		}
+
+		if (tooltip != null && _useCupertinoNative) {
+			return Tooltip(
+				message: tooltip!,
+				child: button,
+			);
+		}
+
+		return button;
+	}
+}
+
+class AppFloatingButton extends StatelessWidget {
+	const AppFloatingButton({
+		super.key,
+		required this.label,
+		required this.onPressed,
+		this.icon,
+		this.color,
+	});
+
+	final String label;
+	final VoidCallback? onPressed;
+	final AppSymbol? icon;
+	final Color? color;
+
+	@override
+	Widget build(BuildContext context) {
+		if (_useCupertinoNative) {
+			return AppButton(
+				label: label,
+				variant: AppButtonVariant.primary,
+				onPressed: onPressed,
+				expand: false,
+			);
+		}
+
+		if (icon != null) {
+			return FloatingActionButton.extended(
+				onPressed: onPressed,
+				icon: Icon(icon!.materialIcon),
+				label: Text(label),
+				backgroundColor: color,
+			);
+		}
+
+		return FloatingActionButton(
+			onPressed: onPressed,
+			backgroundColor: color,
+			child: const Icon(Icons.add),
+		);
+	}
+}
+
+class AppTabItem {
+	const AppTabItem({required this.label, required this.symbol});
+
+	final String label;
+	final AppSymbol symbol;
+}
+
+class AppTabBar extends StatelessWidget {
+	const AppTabBar({
+		super.key,
+		required this.items,
+		required this.currentIndex,
+		required this.onTap,
+	});
+
+	final List<AppTabItem> items;
+	final int currentIndex;
+	final ValueChanged<int> onTap;
+
+	@override
+	Widget build(BuildContext context) {
+		return AdaptiveNavigationBar(
+			currentIndex: currentIndex,
+			onDestinationSelected: onTap,
+			destinations: [
+				for (final item in items)
+					AdaptiveNavigationDestination(
+						icon: Icon(item.symbol.materialIcon),
+						label: item.label,
+					),
+			],
+		);
+	}
+}
+
+
+
+class AppEmptyStateIcon extends StatelessWidget {
+	const AppEmptyStateIcon({
+		super.key,
+		required this.symbol,
+		this.size = 64,
+		this.color,
+	});
+
+	final AppSymbol symbol;
+	final double size;
+	final Color? color;
+
+	@override
+	Widget build(BuildContext context) {
+		return AppIcon(
+			symbol: symbol,
+			size: size,
+			color: color ?? Theme.of(context).colorScheme.outlineVariant,
+		);
+	}
+}
+

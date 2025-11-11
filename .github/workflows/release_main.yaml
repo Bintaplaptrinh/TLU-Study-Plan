@@ -1,0 +1,80 @@
+name: Build & Release in Main branch
+
+on:
+  push:
+    branches:
+      - main # Trigger on push to main branch
+
+# Add permissions block
+permissions:
+  contents: write # This is required for creating releases
+
+jobs:
+  build:
+    if: "contains(github.event.head_commit.message, '[release]')"
+    name: Build & Release
+    runs-on: macos-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      # Add Java 21 setup step
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      
+      - name: Create necessary files
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/rel.jks
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: 'stable'
+      
+      - name: Get dependencies
+        run: flutter pub get
+        
+      - name: Build APK
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
+
+      - name: Build App Bundle
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
+
+      - name: Build iOS (No Codesign)
+        run: |
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload
+          zip -r app-release.ipa Payload
+        
+      - name: Generate Release Tag
+        id: tag
+        run: |
+          echo "release_tag=release_$(date +"%Y.%m.%d_%H-%M")" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+            build/ios/iphoneos/app-release.ipa
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

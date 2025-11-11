@@ -1,0 +1,21 @@
+# Setting up Docker for macOS virtualization
+
+version: '3'
+services:
+  macos:
+    image: dockurr/macos
+    environment:
+      VERSION: "14" # macOS version, we are using version 15 for better compatibility with Xcode
+      RAM_SIZE: "5G" # Recommended RAM size is at least 8GB
+      CPU_CORES: "4"
+    devices:
+      - /dev/kvm
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./storage:/storage # This folder will store your entire system
+    ports:
+      - 8006:8006 # Access the graphical interface via this port
+      - 5900:5900/tcp
+      - 5900:5900/udp
+    stop_grace_period: 2m

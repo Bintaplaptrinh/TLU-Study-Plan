@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">sinhvien1.tlu.edu.vn</domain>
+        
+        <!-- Certificate Pinning DISABLED temporarily - app was crashing -->
+        <!-- Will enable after fixing the root cause -->
+        <!-- Pinning was: //5hIk8ALQCMJUEAeADmAIglqgAoAPEAYSJRJQYAkgFZAFkAiCXFAGAARABYJQ0ACgD8AFcAVwCRJRAjdwBzABkiKQANAAoA -->
+        
+        <trust-anchors>
+            <!-- System default CAs - development mode -->
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
