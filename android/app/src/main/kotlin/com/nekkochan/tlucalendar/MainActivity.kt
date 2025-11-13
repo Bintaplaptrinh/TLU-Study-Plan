@@ -1,4 +1,4 @@
-package com.nekkochan.tlucalendar
+package com.tlu.studyplanner
 
 import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity
@@ -6,7 +6,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.nekkochan.tlucalendar/navigation"
+    private val CHANNEL = "com.tlu.studyplanner/navigation"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

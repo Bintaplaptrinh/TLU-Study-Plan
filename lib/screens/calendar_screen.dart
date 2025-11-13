@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
+import 'package:tlustudy_planner/theme/app_theme.dart';
 import 'package:tlustudy_planner/widgets/empty_state_widget.dart';
+import 'package:tlustudy_planner/widgets/styled_dropdown.dart';
+import 'package:tlustudy_planner/screens/choose_date_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -11,123 +15,121 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  static const double _dateChipWidth = 76;
+  static const double _dateChipSpacing = 12;
+  static const double _dateListHorizontalPadding = 16;
+
   late DateTime _selectedDate;
   late DateTime _focusedMonth;
-  final ScrollController _leftScrollController = ScrollController();
-  final ScrollController _rightScrollController = ScrollController();
-  final Map<String, GlobalKey> _leftDateKeys = {};
-  final Map<String, GlobalKey> _rightDateKeys = {};
+  String? _selectedFilter;
+  late final ScrollController _dateScrollController;
+  bool _hasScrolledToInitialDate = false;
+
+  static const List<String> _quickFilters = [
+    'today',
+    'tomorrow',
+    'next 2 day',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
-    _focusedMonth = DateTime.now();
+    final now = DateTime.now();
+    _selectedDate = DateTime(now.year, now.month, now.day);
+    _focusedMonth = DateTime(now.year, now.month);
+    _selectedFilter = 'today';
+    _dateScrollController = ScrollController();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelectedDate();
+    });
   }
 
   @override
   void dispose() {
-    _leftScrollController.dispose();
-    _rightScrollController.dispose();
+    _dateScrollController.dispose();
     super.dispose();
-  }
-
-  String _getDateKey(DateTime date) {
-    return '${date.year}-${date.month}-${date.day}';
-  }
-
-  void _scrollToDate(DateTime date) {
-    final dateKey = _getDateKey(date);
-    
-    // Scroll right column (event cards)
-    final rightKey = _rightDateKeys[dateKey];
-    if (rightKey != null && rightKey.currentContext != null) {
-      Future.delayed(const Duration(milliseconds: 50), () {
-        Scrollable.ensureVisible(
-          rightKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-          alignment: 0.0,
-        );
-      });
-    }
-    
-    // Scroll left column (date items) to keep selected date visible
-    final leftKey = _leftDateKeys[dateKey];
-    if (leftKey != null && leftKey.currentContext != null) {
-      Future.delayed(const Duration(milliseconds: 50), () {
-        Scrollable.ensureVisible(
-          leftKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-          alignment: 0.3,
-        );
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final monthLabel = DateFormat('MMMM yyyy').format(_focusedMonth);
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with semester selector
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Lịch học',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Lịch học',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              monthLabel,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.6),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      _buildCalendarPickerButton(context),
+                    ],
                   ),
-                  // Month navigation
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left, size: 28),
-                    onPressed: () {
-                      setState(() {
-                        _focusedMonth = DateTime(
-                          _focusedMonth.year,
-                          _focusedMonth.month - 1,
-                        );
-                      });
-                    },
-                  ),
-                  Text(
-                    'T${_focusedMonth.month}/${_focusedMonth.year}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right, size: 28),
-                    onPressed: () {
-                      setState(() {
-                        _focusedMonth = DateTime(
-                          _focusedMonth.year,
-                          _focusedMonth.month + 1,
-                        );
-                      });
-                    },
-                  ),
+                  const SizedBox(height: 16),
+                  _buildQuickFilterDropdown(context),
+                  const SizedBox(height: 16),
+                  _buildSemesterSelector(context),
                 ],
               ),
             ),
-            // Semester selector (compact)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
-              child: _buildSemesterSelector(context),
-            ),
+            SizedBox(height: 110, child: _buildHorizontalDatePicker(context)),
             const SizedBox(height: 24),
-            // Split Timeline Layout
             Expanded(
-              child: _buildSplitTimelineLayout(context),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(32),
+                    topRight: Radius.circular(32),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 24,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                  child: _buildDayCourses(context),
+                ),
+              ),
             ),
           ],
         ),
@@ -135,67 +137,222 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  Widget _buildCalendarPickerButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final pickedDate = await Navigator.of(context).push<DateTime>(
+          MaterialPageRoute(
+            builder: (_) => ChooseDateScreen(initialDate: _selectedDate),
+          ),
+        );
+        if (pickedDate != null) {
+          setState(() {
+            _selectDate(pickedDate, resetFilter: true);
+          });
+        }
+      },
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.12),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.calendar_month_rounded,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickFilterDropdown(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: StyledDropdownButton<String>(
+        value: _selectedFilter,
+        hint: 'Chọn nhanh',
+        items: _quickFilters
+            .map(
+              (filter) => DropdownMenuItem<String>(
+                value: filter,
+                child: Text(filter.toUpperCase()),
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          if (value == null) return;
+          _applyQuickFilter(value);
+        },
+      ),
+    );
+  }
+
   Widget _buildSemesterSelector(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, _) {
-        if (userProvider.schoolYears == null) {
+        final schoolYears = userProvider.schoolYears;
+        if (schoolYears == null) {
           return const SizedBox.shrink();
         }
 
-        // Get all semesters from all school years
-        final allSemesters = userProvider.schoolYears!.content
-            .expand((year) => year.semesters)
-            .toList();
-
-        if (allSemesters.isEmpty) {
+        final semesters =
+            schoolYears.content.expand((year) => year.semesters).toList();
+        if (semesters.isEmpty) {
           return const SizedBox.shrink();
         }
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-            ),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<int>(
-              value: userProvider.selectedSemester?.id,
-              isExpanded: true,
-              icon: const Icon(Icons.arrow_drop_down, size: 20),
-              style: Theme.of(context).textTheme.bodyMedium,
-              items: allSemesters.map((semester) {
-                return DropdownMenuItem<int>(
-                  value: semester.id,
-                  child: Text(
-                    semester.semesterName,
-                    style: TextStyle(
+        return StyledDropdownButton<int>(
+          value: userProvider.selectedSemester?.id,
+          isExpanded: true,
+          items: semesters.map((semester) {
+            final isSelected = semester.id == userProvider.selectedSemester?.id;
+            return DropdownMenuItem<int>(
+              value: semester.id,
+              child: Text(
+                semester.semesterName,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontWeight:
-                          semester.id == userProvider.selectedSemester?.id
-                          ? FontWeight.w600
-                          : FontWeight.normal,
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
                     ),
-                  ),
-                );
-              }).toList(),
-              onChanged: (semesterId) async {
-                if (semesterId != null) {
-                  final semester = allSemesters.firstWhere(
-                    (s) => s.id == semesterId,
-                  );
-                  await userProvider.selectSemester(semester);
-                }
-              },
-            ),
-          ),
+              ),
+            );
+          }).toList(),
+          onChanged: (semesterId) async {
+            if (semesterId == null) return;
+            final semester =
+                semesters.firstWhere((candidate) => candidate.id == semesterId);
+            await userProvider.selectSemester(semester);
+            final semesterStart =
+                DateTime.fromMillisecondsSinceEpoch(semester.startDate);
+            setState(() {
+              _selectedFilter = null;
+              _selectDate(semesterStart);
+            });
+          },
         );
       },
     );
   }
 
-  Widget _buildSplitTimelineLayout(BuildContext context) {
+  Widget _buildHorizontalDatePicker(BuildContext context) {
+    final days = _generateDaysForMonth(_focusedMonth);
+    final userProvider = context.watch<UserProvider>();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        _dateListHorizontalPadding,
+        0,
+        _dateListHorizontalPadding,
+        10,
+      ),
+      controller: _dateScrollController,
+      child: Row(
+        children: [
+          for (var i = 0; i < days.length; i++)
+            Padding(
+              padding: EdgeInsets.only(
+                right: i == days.length - 1 ? 0 : _dateChipSpacing,
+              ),
+              child: _buildDateChip(
+                context,
+                days[i],
+                _hasCoursesOnDate(userProvider, days[i]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateChip(
+    BuildContext context,
+    DateTime date,
+    bool hasCourses,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSelected = _isSameDate(date, _selectedDate);
+    final isToday = _isSameDate(date, DateTime.now());
+
+    final dayLabel = DateFormat('EEE').format(date).toUpperCase();
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = null;
+          _selectDate(date);
+        });
+      },
+      child: Container(
+        width: _dateChipWidth,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.accentColor : colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isToday ? AppTheme.accentColor : colorScheme.outlineVariant.withOpacity(0.3),
+            width: isToday ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isSelected ? 0.18 : 0.08),
+              blurRadius: isSelected ? 24 : 18,
+              offset: const Offset(0, 12),
+              spreadRadius: -4,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              dayLabel,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isSelected 
+                        ? Colors.black 
+                        : colorScheme.onSurface.withOpacity(0.6),
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${date.day}',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                    color: isSelected ? Colors.black : colorScheme.onSurface,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            AnimatedOpacity(
+              opacity: hasCourses ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: AppTheme.accentColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDayCourses(BuildContext context) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, _) {
         if (!userProvider.isLoggedIn) {
@@ -206,6 +363,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           );
         }
 
+        // Show loading indicator while fetching courses
         if (userProvider.isLoadingCourses) {
           return Center(
             child: Column(
@@ -216,7 +374,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Text(
                   'Đang tải lịch học...',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.6),
                   ),
                 ),
               ],
@@ -224,144 +384,160 @@ class _CalendarScreenState extends State<CalendarScreen> {
           );
         }
 
-        // Get all days in the month that have courses
-        final daysWithCourses = _getDaysWithCourses(userProvider);
+        // Get courses for selected date
+        final activeCourses = userProvider.getActiveCourses(_selectedDate);
 
-        if (daysWithCourses.isEmpty) {
+        final dayWeekIndex = _selectedDate.weekday + 1;
+
+        final dayCourses =
+            activeCourses.where((c) => c.dayOfWeek == dayWeekIndex).toList()
+              ..sort((a, b) => a.startCourseHour.compareTo(b.startCourseHour));
+
+        if (dayCourses.isEmpty) {
           return EmptyStateWidget(
             icon: Icons.event_available_outlined,
             title: 'Không có lớp',
-            description: 'Không có lịch học trong tháng này',
+            description: 'Chọn một ngày khác để xem lịch học',
           );
         }
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Left column: Date navigator
-            Container(
-              width: 100,
-              padding: const EdgeInsets.only(left: 16, right: 8),
-              child: ListView.builder(
-                controller: _leftScrollController,
-                itemCount: daysWithCourses.length,
-                itemBuilder: (context, index) {
-                  final date = daysWithCourses[index];
-                  final dateKey = _getDateKey(date);
-                  
-                  // Create or reuse GlobalKey for left date item
-                  if (!_leftDateKeys.containsKey(dateKey)) {
-                    _leftDateKeys[dateKey] = GlobalKey();
-                  }
-                  
-                  return Container(
-                    key: _leftDateKeys[dateKey],
-                    child: _buildDateItem(context, date),
-                  );
-                },
-              ),
-            ),
-            // Right column: Event cards
-            Expanded(
-              child: ListView.builder(
-                controller: _rightScrollController,
-                padding: const EdgeInsets.only(right: 16, bottom: 16),
-                itemCount: daysWithCourses.length,
-                itemBuilder: (context, index) {
-                  final date = daysWithCourses[index];
-                  final dateKey = _getDateKey(date);
-                  
-                  // Create or reuse GlobalKey for right event cards
-                  if (!_rightDateKeys.containsKey(dateKey)) {
-                    _rightDateKeys[dateKey] = GlobalKey();
-                  }
-                  
-                  return Container(
-                    key: _rightDateKeys[dateKey],
-                    child: _buildEventCardsForDate(context, userProvider, date),
-                  );
-                },
-              ),
-            ),
-          ],
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: dayCourses.length,
+          itemBuilder: (context, index) {
+            return _buildCourseCard(context, userProvider, dayCourses[index]);
+          },
         );
       },
     );
   }
 
-  List<DateTime> _getDaysWithCourses(UserProvider userProvider) {
-    final lastDayOfMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0);
-    
-    final daysWithCourses = <DateTime>[];
-    
-    for (int day = 1; day <= lastDayOfMonth.day; day++) {
-      final date = DateTime(_focusedMonth.year, _focusedMonth.month, day);
-      final activeCourses = userProvider.getActiveCourses(date);
-      final dayWeekIndex = date.weekday + 1;
-      final hasCourses = activeCourses.any((c) => c.dayOfWeek == dayWeekIndex);
-      
-      if (hasCourses) {
-        daysWithCourses.add(date);
-      }
-    }
-    
-    return daysWithCourses;
-  }
+  Widget _buildCourseCard(
+    BuildContext context,
+    UserProvider userProvider,
+    course,
+  ) {
+    final timeRange = _getTimeRange(userProvider, course);
+    final colorScheme = Theme.of(context).colorScheme;
 
-  Widget _buildDateItem(BuildContext context, DateTime date) {
-    final isSelected = date.year == _selectedDate.year &&
-        date.month == _selectedDate.month &&
-        date.day == _selectedDate.day;
-    final isToday = date.year == DateTime.now().year &&
-        date.month == DateTime.now().month &&
-        date.day == DateTime.now().day;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedDate = date;
-        });
-        _scrollToDate(date);
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 32),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: colorScheme.outlineVariant,
+          width: 1,
         ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${date.day}',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : isToday
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
+            // Header: Time and Title
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Time badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        timeRange.split('\n')[0], // Start time
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        width: 20,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: colorScheme.onPrimaryContainer.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                      Text(
+                        timeRange.split('\n')[1], // End time
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Course name
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        course.courseName,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          course.courseCode,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              _getWeekdayShort(date.weekday),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                fontSize: 11,
+            const SizedBox(height: 16),
+            // Location
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_on_rounded,
+                    size: 18,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      course.building.isNotEmpty
+                          ? 'Phòng ${course.room} - ${course.building}'
+                          : 'Phòng ${course.room}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -369,193 +545,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
     );
   }
-
-  String _getWeekdayShort(int weekday) {
-    switch (weekday) {
-      case DateTime.monday:
-        return 'T2';
-      case DateTime.tuesday:
-        return 'T3';
-      case DateTime.wednesday:
-        return 'T4';
-      case DateTime.thursday:
-        return 'T5';
-      case DateTime.friday:
-        return 'T6';
-      case DateTime.saturday:
-        return 'T7';
-      case DateTime.sunday:
-        return 'CN';
-      default:
-        return '';
-    }
-  }
-
-  Widget _buildEventCardsForDate(
-    BuildContext context,
-    UserProvider userProvider,
-    DateTime date,
-  ) {
-    final activeCourses = userProvider.getActiveCourses(date);
-    final dayWeekIndex = date.weekday + 1;
-    final dayCourses = activeCourses
-        .where((c) => c.dayOfWeek == dayWeekIndex)
-        .toList()
-      ..sort((a, b) => a.startCourseHour.compareTo(b.startCourseHour));
-
-    final isSelected = date.year == _selectedDate.year &&
-        date.month == _selectedDate.month &&
-        date.day == _selectedDate.day;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Date header for the event group (subtle, only visible when scrolling)
-        if (!isSelected)
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 12, top: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 2,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(1),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${date.day} Th${date.month}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ...dayCourses.map((course) {
-          return _buildEventCard(context, userProvider, course, isSelected);
-        }).toList(),
-      ],
-    );
-  }
-
-  Widget _buildEventCard(
-    BuildContext context,
-    UserProvider userProvider,
-    course,
-    bool isSelected,
-  ) {
-    final timeRange = _getTimeRange(userProvider, course);
-    final times = timeRange.split('\n');
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(isSelected ? 0.12 : 0.08),
-            blurRadius: isSelected ? 20 : 16,
-            offset: Offset(0, isSelected ? 6 : 4),
-          ),
-        ],
-        border: Border.all(
-          color: isSelected 
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
-              : Theme.of(context).colorScheme.outline.withOpacity(0.1),
-          width: isSelected ? 1.5 : 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: Title and Time
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Category indicator
-              Container(
-                width: 4,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Title
-              Expanded(
-                child: Text(
-                  course.courseName,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    height: 1.3,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Time
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${times[0]} - ${times[1]}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Course code
-          Text(
-            course.courseCode,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Location
-          Row(
-            children: [
-              Icon(
-                Icons.location_on_outlined,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                course.building.isNotEmpty
-                    ? '${course.room} - ${course.building}'
-                    : course.room,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-
 
   String _getTimeRange(UserProvider userProvider, course) {
     final startHour = userProvider.courseHours[course.startCourseHour];
@@ -566,5 +555,93 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     return 'Tiết ${course.startCourseHour}\nTiết ${course.endCourseHour}';
+  }
+
+  void _applyQuickFilter(String filter) {
+    final now = DateTime.now();
+    DateTime target;
+    switch (filter) {
+      case 'tomorrow':
+        target = now.add(const Duration(days: 1));
+        break;
+      case 'next 2 day':
+        target = now.add(const Duration(days: 2));
+        break;
+      case 'today':
+      default:
+        target = now;
+        break;
+    }
+    setState(() {
+      _selectedFilter = filter;
+      _selectDate(target);
+    });
+  }
+
+  void _selectDate(DateTime date, {bool resetFilter = false}) {
+    final normalized = DateTime(date.year, date.month, date.day);
+    _selectedDate = normalized;
+    _focusedMonth = DateTime(normalized.year, normalized.month);
+    if (resetFilter) {
+      _selectedFilter = null;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelectedDate(force: true);
+    });
+  }
+
+  List<DateTime> _generateDaysForMonth(DateTime month) {
+    final totalDays = DateUtils.getDaysInMonth(month.year, month.month);
+    return List.generate(totalDays, (index) {
+      return DateTime(month.year, month.month, index + 1);
+    });
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _hasCoursesOnDate(UserProvider userProvider, DateTime date) {
+    if (!userProvider.isLoggedIn) {
+      return false;
+    }
+
+    final activeCourses = userProvider.getActiveCourses(date);
+    final dayWeekIndex = date.weekday + 1;
+    return activeCourses.any((course) => course.dayOfWeek == dayWeekIndex);
+  }
+
+  void _scrollToSelectedDate({bool force = false}) {
+    if (!force && _hasScrolledToInitialDate) {
+      return;
+    }
+
+    if (!_dateScrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToSelectedDate(force: force);
+      });
+      return;
+    }
+
+    final days = _generateDaysForMonth(_focusedMonth);
+    final index = days.indexWhere((day) => _isSameDate(day, _selectedDate));
+    if (index == -1) {
+      return;
+    }
+
+    final rawOffset = _dateListHorizontalPadding +
+        index * (_dateChipWidth + _dateChipSpacing);
+    final maxExtent = _dateScrollController.position.maxScrollExtent;
+    final targetOffset =
+        (rawOffset - _dateListHorizontalPadding).clamp(0.0, maxExtent);
+
+    if (!force) {
+      _hasScrolledToInitialDate = true;
+    }
+    _dateScrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 }

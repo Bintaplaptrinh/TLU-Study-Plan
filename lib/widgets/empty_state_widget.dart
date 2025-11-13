@@ -18,12 +18,12 @@ class EmptyStateWidget extends StatelessWidget {
     
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(22),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
                 shape: BoxShape.circle,

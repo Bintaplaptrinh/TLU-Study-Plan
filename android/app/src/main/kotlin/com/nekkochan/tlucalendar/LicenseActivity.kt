@@ -1,4 +1,4 @@
-package com.nekkochan.tlucalendar
+package com.tlu.studyplanner
 
 import android.app.Activity
 import android.os.Bundle
@@ -25,7 +25,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
-import com.nekkochan.tlucalendar.ui.theme.TLUCalendarTheme
+import com.tlu.studyplanner.ui.theme.TLUCalendarTheme
 
 class LicenseActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)

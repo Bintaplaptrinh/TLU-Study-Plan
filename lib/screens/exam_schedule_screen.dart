@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:tlustudy_planner/providers/exam_provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/models/api_response.dart';
+import 'package:tlustudy_planner/widgets/styled_dropdown.dart';
 
 class ExamScheduleScreen extends StatefulWidget {
   const ExamScheduleScreen({super.key});
@@ -160,22 +161,23 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                     if (examProvider.isLoadingSemesters)
                       const Center(child: CircularProgressIndicator())
                     else if (examProvider.availableSemesters.isNotEmpty)
-                      DropdownButtonFormField<int>(
+                      StyledDropdownFormField<int>(
                         value: examProvider.selectedSemesterId,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
                         items: examProvider.availableSemesters
                             .map(
                               (semester) => DropdownMenuItem<int>(
                                 value: semester.id,
                                 child: Row(
                                   children: [
-                                    Text(semester.semesterName),
+                                    Text(
+                                      semester.semesterName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
                                     if (semester.isCurrent) ...[
                                       const SizedBox(width: 8),
                                       Container(
@@ -247,20 +249,24 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
+                    StyledDropdownFormField<int>(
                       value: examProvider.selectedRegisterPeriodId,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
+                      isExpanded: true,
                       items: examProvider.registerPeriods
                           .map(
                             (period) => DropdownMenuItem<int>(
                               value: period.id,
-                              child: Text(period.name),
+                              child: Text(
+                                period.name,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
                             ),
                           )
                           .toList(),
@@ -300,20 +306,21 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
+                    StyledDropdownFormField<int>(
                       value: examProvider.selectedExamRound,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
                       items: [1, 2, 3, 4, 5]
                           .map(
                             (round) => DropdownMenuItem<int>(
                               value: round,
-                              child: Text('Lần $round'),
+                              child: Text(
+                                'Lần $round',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
                             ),
                           )
                           .toList(),

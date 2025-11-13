@@ -23,6 +23,8 @@ dependencies:
   timezone: ^0.10.1
   android_alarm_manager_plus: ^5.0.0  # For exact daily alarms
   adaptive_platform_ui: ^0.1.100
+  home_widget: ^0.8.1  # For home screen widget
+  intl: ^0.20.2  # For date formatting
 
 dev_dependencies:
   flutter_test:

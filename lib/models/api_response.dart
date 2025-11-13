@@ -989,3 +989,166 @@ class Room {
     );
   }
 }
+
+/// StudentSubjectMark represents student's mark for a subject
+class StudentSubjectMark {
+  final int id;
+  final String subjectCode;
+  final String subjectName;
+  final int credits;
+  final double? mark10;
+  final double? mark4;
+  final String? markLetter;
+  final String? markText;
+  final int semesterId;
+  final String semesterName;
+  final bool isPassed;
+
+  StudentSubjectMark({
+    required this.id,
+    required this.subjectCode,
+    required this.subjectName,
+    required this.credits,
+    this.mark10,
+    this.mark4,
+    this.markLetter,
+    this.markText,
+    required this.semesterId,
+    required this.semesterName,
+    required this.isPassed,
+  });
+
+  factory StudentSubjectMark.fromJson(Map<String, dynamic> json) {
+    // Helper to safely parse numeric fields
+    int parseIntField(dynamic value, int defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
+    double? parseDoubleField(dynamic value) {
+      if (value == null) return null;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    bool parseBoolField(dynamic value, bool defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is bool) return value;
+      if (value is int) return value != 0;
+      if (value is String) {
+        final lower = value.toLowerCase();
+        if (lower == 'true' || lower == '1') return true;
+        if (lower == 'false' || lower == '0') return false;
+      }
+      return defaultValue;
+    }
+
+    return StudentSubjectMark(
+      id: parseIntField(json['id'], 0),
+      subjectCode: json['subjectCode']?.toString() ?? '',
+      subjectName: json['subjectName']?.toString() ?? '',
+      credits: parseIntField(json['credits'], 0),
+      mark10: parseDoubleField(json['mark10']),
+      mark4: parseDoubleField(json['mark4']),
+      markLetter: json['markLetter']?.toString(),
+      markText: json['markText']?.toString(),
+      semesterId: parseIntField(json['semesterId'], 0),
+      semesterName: json['semesterName']?.toString() ?? '',
+      isPassed: parseBoolField(json['isPassed'], false),
+    );
+  }
+}
+
+/// StudentBehaviorMark represents student's behavior mark for a semester
+class StudentBehaviorMark {
+  final int id;
+  final int semesterId;
+  final String semesterName;
+  final int mark;
+  final String classification;
+  final String? note;
+
+  StudentBehaviorMark({
+    required this.id,
+    required this.semesterId,
+    required this.semesterName,
+    required this.mark,
+    required this.classification,
+    this.note,
+  });
+
+  factory StudentBehaviorMark.fromJson(Map<String, dynamic> json) {
+    // Handle both int and double for numeric fields
+    int parseIntField(dynamic value, int defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
+    return StudentBehaviorMark(
+      id: parseIntField(json['id'], 0),
+      semesterId: parseIntField(json['semesterId'], 0),
+      semesterName: json['semesterName']?.toString() ?? '',
+      mark: parseIntField(json['mark'], 0),
+      classification: json['classification']?.toString() ?? '',
+      note: json['note']?.toString(),
+    );
+  }
+}
+
+/// StudentTuition represents student's tuition payment information
+class StudentTuition {
+  final int semesterId;
+  final String semesterName;
+  final double tuitionFee;
+  final double paidAmount;
+  final double remainingAmount;
+  final String paymentStatus;
+  final String? paymentDeadline;
+
+  StudentTuition({
+    required this.semesterId,
+    required this.semesterName,
+    required this.tuitionFee,
+    required this.paidAmount,
+    required this.remainingAmount,
+    required this.paymentStatus,
+    this.paymentDeadline,
+  });
+
+  factory StudentTuition.fromJson(Map<String, dynamic> json) {
+    // Helper functions for safe parsing
+    int parseIntField(dynamic value, int defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
+    double parseDoubleField(dynamic value, double defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
+    return StudentTuition(
+      semesterId: parseIntField(json['semesterId'], 0),
+      semesterName: json['semesterName']?.toString() ?? '',
+      tuitionFee: parseDoubleField(json['tuitionFee'], 0.0),
+      paidAmount: parseDoubleField(json['paidAmount'], 0.0),
+      remainingAmount: parseDoubleField(json['remainingAmount'], 0.0),
+      paymentStatus: json['paymentStatus']?.toString() ?? '',
+      paymentDeadline: json['paymentDeadline']?.toString(),
+    );
+  }
+}

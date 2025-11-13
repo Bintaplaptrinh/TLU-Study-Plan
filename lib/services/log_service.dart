@@ -50,15 +50,15 @@ class LogService {
   String _getLogIcon(LogLevel level) {
     switch (level) {
       case LogLevel.debug:
-        return '🔍';
+        return 'Debug';
       case LogLevel.info:
-        return 'ℹ️';
+        return 'Inofo';
       case LogLevel.warning:
-        return '⚠️';
+        return 'Warning';
       case LogLevel.error:
-        return '❌';
+        return 'Error';
       case LogLevel.success:
-        return '✅';
+        return 'Success';
     }
   }
 

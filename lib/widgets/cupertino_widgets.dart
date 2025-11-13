@@ -31,6 +31,7 @@ class AppIcons {
 	static const today = AppSymbol('calendar.today', Icons.today);
 	static const calendar = AppSymbol('calendar', Icons.calendar_month);
 	static const sun = AppSymbol('sun.max', Icons.wb_sunny);
+	static const utilities = AppSymbol('square.grid.2x2', Icons.apps);
 }
 
 class AppIcon extends StatelessWidget {

@@ -100,7 +100,7 @@ class _TodayScreenState extends State<TodayScreen> {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             Text(
-                              'Hôm nay',
+                              'Hi, ${userProvider.tluUser?.displayName ?? userProvider.currentUser.fullName}',
                               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.onPrimary,
