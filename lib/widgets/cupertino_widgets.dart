@@ -1,4 +1,3 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -74,7 +73,7 @@ class AppSwitch extends StatelessWidget {
 
 	@override
 	Widget build(BuildContext context) {
-		return AdaptiveSwitch(
+		return Switch.adaptive(
 			value: value,
 			onChanged: enabled ? onChanged : null,
 			activeColor: color,
