@@ -5,14 +5,19 @@ plugins {
     id("com.mikepenz.aboutlibraries.plugin.android")
     id("com.android.application")
     id("kotlin-android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("dev.flutter.flutter-gradle-plugin")
+    // Compose Compiler plugin (required for Kotlin 2.0+)
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.tlu.studyplanner"
-    compileSdk = 34
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Flag to enable support for the new language APIs
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -24,10 +29,10 @@ android {
 
     defaultConfig {
         applicationId = "com.tlu.studyplanner"
-        minSdk = 21
-        targetSdk = 34
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
         versionCode = 2025110220
-        versionName = "1.0.0"
+        versionName = flutter.versionName
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
@@ -57,20 +62,25 @@ android {
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
+
             ndk {
                 abiFilters += listOf("armeabi-v7a", "arm64-v8a")
             }
         }
+
         release {
+            // Assign signing config if keystore exists
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android.txt"),
                 "proguard-rules.pro"
             )
+
             ndk {
                 abiFilters += listOf("armeabi-v7a", "arm64-v8a")
             }
@@ -78,15 +88,11 @@ android {
     }
 }
 
+flutter {
+    source = "../.."
+}
+
 dependencies {
-    // Flutter Embedding
-    debugImplementation("io.flutter:flutter_embedding_debug:1.0.0-e7978291e77b97c8a74c153842c1d0defa1a8112")
-    releaseImplementation("io.flutter:flutter_embedding_release:1.0.0-e7978291e77b97c8a74c153842c1d0defa1a8112")
-
-    // Manually added Flutter plugin native dependencies
-    implementation("com.dexterous.flutterlocalnotifications:flutter_local_notifications:17.1.2")
-    implementation("dev.fluttercommunity.plus.androidalarmmanager:android_alarm_manager_plus:5.0.2")
-
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
     implementation("androidx.activity:activity-compose:1.11.0")
@@ -104,4 +110,5 @@ dependencies {
     implementation("com.mikepenz:aboutlibraries-compose:13.1.0")
     implementation("com.mikepenz:aboutlibraries-compose-m3:13.1.0")
     implementation("com.mikepenz:aboutlibraries:13.1.0")
+
 }

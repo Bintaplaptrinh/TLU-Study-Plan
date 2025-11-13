@@ -1,4 +1,4 @@
-package com.nekkochan.tlucalendar
+package com.tlu.studyplanner
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider

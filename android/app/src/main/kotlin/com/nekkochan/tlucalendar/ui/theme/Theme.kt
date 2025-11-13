@@ -1,4 +1,4 @@
-package com.nekkochan.tlucalendar.ui.theme
+package com.tlu.studyplanner.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme

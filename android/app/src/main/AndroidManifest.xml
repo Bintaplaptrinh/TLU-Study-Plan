@@ -13,11 +13,12 @@
 
     <application
         android:label="TLU Study Planner"
+        android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config">
 
         <activity
-            android:name="com.tlu.studyplanner.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
@@ -39,17 +40,17 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="com.tlu.studyplanner.LicenseActivity"
+            android:name=".LicenseActivity"
             android:exported="false"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-            android:parentActivityName="com.tlu.studyplanner.MainActivity"
+            android:parentActivityName=".MainActivity"
             android:launchMode="singleTop"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.tlu.studyplanner.MainActivity" />
+                android:value=".MainActivity" />
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
