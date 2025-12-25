@@ -34,7 +34,6 @@ class ScheduleCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ⏰ TIME - Left Side (Compact & Highlighted)
                 Container(
                   decoration: BoxDecoration(
                     color: colorScheme.onPrimaryContainer.withValues(

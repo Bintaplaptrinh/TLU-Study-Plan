@@ -736,7 +736,6 @@ class LecturerInfo {
 }
 
 /// RegisterPeriod represents an exam registration period
-/// Each period has a type (e.g., "Học kỳ chính", "Chuẩn đầu ra ngoại ngữ")
 class RegisterPeriod {
   final int id;
   final bool voided;

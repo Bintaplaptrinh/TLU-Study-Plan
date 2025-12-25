@@ -21,10 +21,8 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
   Widget build(BuildContext context) {
     return Consumer<ExamProvider>(
       builder: (context, examProvider, child) {
-        // Check if caching just completed
         if (!examProvider.isPreCaching && examProvider.preCacheProgress == 100 && !_wasCompleted) {
           _wasCompleted = true;
-          // Auto-hide after 3 seconds
           Future.delayed(const Duration(seconds: 3), () {
             if (mounted) {
               setState(() {
@@ -40,7 +38,6 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
           _shouldHide = false;
         }
 
-        // Don't show if not currently pre-caching and not showing completion message
         if (!examProvider.isPreCaching && (examProvider.preCacheProgress != 100 || _shouldHide)) {
           return const SizedBox.shrink();
         }
@@ -136,7 +133,7 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
                   if (!examProvider.isPreCaching && examProvider.preCacheProgress == 100) ...[
                     const SizedBox(height: 8),
                     const Text(
-                      '✓ Ứng dụng có thể hoạt động hoàn toàn offline',
+                      'Ứng dụng có thể hoạt động hoàn toàn offline',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 11,
@@ -155,7 +152,6 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
   }
 }
 
-/// Floating action button to resume caching if interrupted
 class ResumeCachingButton extends StatelessWidget {
   const ResumeCachingButton({Key? key}) : super(key: key);
 
@@ -163,12 +159,10 @@ class ResumeCachingButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ExamProvider>(
       builder: (context, examProvider, child) {
-        // Only show if NOT currently caching AND cache is incomplete
         if (examProvider.isPreCaching || examProvider.preCacheProgress >= 100) {
           return const SizedBox.shrink();
         }
 
-        // Check if there's incomplete cache
         return FutureBuilder<bool>(
           future: examProvider.checkIncompletCache(),
           builder: (context, snapshot) {

@@ -158,7 +158,7 @@ $pins
     buffer.writeln('Domain: $tluDomain');
     buffer.writeln('Pinned Certificates: ${certificatePins.length}');
     if (certificatePins.isEmpty) {
-      buffer.writeln('⚠️  No pins configured - using system certificates');
+      buffer.writeln('No pins configured - using system certificates');
     } else {
       for (int i = 0; i < certificatePins.length; i++) {
         buffer.writeln(

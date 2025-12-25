@@ -1,8 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-/// Modern styled dropdown with glass blur background
-/// Modern styled dropdown with glass blur background (ĐÃ CẬP NHẬT)
 class StyledDropdownButton<T> extends StatelessWidget {
   final T? value;
   final List<DropdownMenuItem<T>> items;
@@ -69,7 +67,6 @@ class StyledDropdownButton<T> extends StatelessWidget {
   }
 }
 
-/// Styled dropdown form field with glass blur background
 class StyledDropdownFormField<T> extends StatelessWidget {
   final T? value;
   final List<DropdownMenuItem<T>> items;

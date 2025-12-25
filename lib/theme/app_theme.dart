@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Centralized theme configuration for the application.
-///
-/// Applies the "Modern Soft UI" palette across both light and dark modes
-/// with rounded shapes and subtle shadows everywhere.
 class AppTheme {
   static const Color primaryColor = Color(0xFFFA2426);
   static const Color backgroundColor = Color(0xFFF1F5F8);

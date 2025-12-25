@@ -465,7 +465,7 @@ class SettingsScreen extends StatelessWidget {
                               Navigator.of(context).pop(); // Close loading dialog
                               messenger.showSnackBar(
                                 SnackBar(
-                                  content: Text('❌ Lỗi: ${e.toString()}'),
+                                  content: Text('Lỗi: ${e.toString()}'),
                                   duration: const Duration(seconds: 3),
                                 ),
                               );
@@ -550,8 +550,6 @@ class SettingsScreen extends StatelessWidget {
                           AppSwitch(
                             value: userProvider.notificationsEnabled,
                             onChanged: (value) async {
-                              // ✅ ALWAYS check current permission status before toggling
-                              // This handles the case where user granted permission in settings
                               await userProvider.checkNotificationPermission();
 
                               // Try to toggle
@@ -774,7 +772,7 @@ class SettingsScreen extends StatelessWidget {
                         //         if (context.mounted) {
                         //           ScaffoldMessenger.of(context).showSnackBar(
                         //             const SnackBar(
-                        //               content: Text('🧪 Đã kích hoạt kiểm tra thủ công - Xem log để biết kết quả'),
+                        //               content: Text('Đã kích hoạt kiểm tra thủ công - Xem log để biết kết quả'),
                         //               duration: Duration(seconds: 3),
                         //             ),
                         //           );

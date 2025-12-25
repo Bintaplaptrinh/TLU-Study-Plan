@@ -63,7 +63,6 @@ class NotificationHelper {
         continue;
       }
 
-      // Parse start time from startString (e.g., "07:00")
       final startParts = startCourseHour.startString.split(':');
       if (startParts.length != 2) {
         _log.log('Invalid start time format: ${startCourseHour.startString}', level: LogLevel.warning);
@@ -105,7 +104,7 @@ class NotificationHelper {
       await _notificationService.scheduleClassNotifications(
         course,
         classDateTime,
-        dayOfWeek + 2, // Convert to 2-based (2=Monday, 3=Tuesday, etc.)
+        dayOfWeek + 2, 
         timeSlot,
       );
     }
@@ -138,7 +137,6 @@ class NotificationHelper {
       _log.log('Exam: ${examRoom.subjectName}', level: LogLevel.debug);
       _log.log('Date from timestamp: $date', level: LogLevel.debug);
 
-      // Parse exam hour start time from startString (e.g., "07:00")
       final startString = examHour.startString;
       if (startString == null) {
         _log.log('No startString in examHour', level: LogLevel.warning);
@@ -188,7 +186,6 @@ class NotificationHelper {
     }
   }
 
-  /// Check if two dates are the same day
   static bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }

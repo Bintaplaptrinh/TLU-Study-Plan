@@ -23,7 +23,7 @@ class ErrorLogger {
       _errorLogs.removeRange(maxLogs, _errorLogs.length);
     }
 
-    debugPrint('🔴 Error logged: $error');
+    debugPrint('Error logged: $error');
   }
 
   List<ErrorLog> getRecentErrors() => List.unmodifiable(_errorLogs);

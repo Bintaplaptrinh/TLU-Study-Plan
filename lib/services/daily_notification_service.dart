@@ -6,10 +6,6 @@ import 'package:path/path.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:tlustudy_planner/services/log_service.dart';
 
-/// Service for sending daily reminders about classes and exams
-/// Platform-specific implementation:
-/// - Android: Uses AlarmManager for exact timing (even when app is closed)
-/// - iOS: Uses scheduled notifications (native iOS scheduling)
 class DailyNotificationService {
   static const int _alarmId = 0; // Unique ID for the daily alarm (Android)
   static const int _iosNotificationId = 999; // ID for iOS daily notification
@@ -136,14 +132,11 @@ class DailyNotificationService {
 
   /// Check if there's a daily task scheduled
   static Future<bool> isDailyCheckScheduled() async {
-    // AlarmManager doesn't provide a direct way to check
-    // We'll rely on SharedPreferences in the actual implementation
     return true; // Placeholder
   }
 }
 
 /// Perform the daily schedule check
-/// ⚠️ MUST be a top-level function for AlarmManager
 @pragma('vm:entry-point')
 Future<void> _performDailyCheck() async {
   final log = LogService();

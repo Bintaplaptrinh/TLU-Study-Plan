@@ -252,7 +252,6 @@ class AppTabBar extends StatelessWidget {
 
 	@override
 	Widget build(BuildContext context) {
-		// Use Flutter's built-in adaptive navigation
 		final isCupertino = Theme.of(context).platform == TargetPlatform.iOS ||
 				Theme.of(context).platform == TargetPlatform.macOS;
 		

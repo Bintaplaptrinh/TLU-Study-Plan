@@ -15,12 +15,10 @@ import 'package:tlustudy_planner/utils/error_logger.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize timezone database for iOS scheduled notifications
   tz.initializeTimeZones();
 
   final errorLogger = ErrorLogger();
 
-  // Capture Flutter framework errors
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     errorLogger.logError(

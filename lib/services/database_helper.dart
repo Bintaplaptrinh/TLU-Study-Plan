@@ -746,8 +746,6 @@ class DatabaseHelper {
 
     await batch.commit(noResult: true);
     
-    // ✅ CRITICAL: Save metadata to track that this round has been cached,
-    // even if it returned zero rooms
     await db.insert(
       'exam_round_cache_metadata',
       {
@@ -831,7 +829,6 @@ class DatabaseHelper {
   }
 
   // Check if cached exam data exists
-  // ✅ NOW CHECKS METADATA TABLE - returns true even for empty rounds
   Future<bool> hasExamRoomCache(
     int semesterId,
     int registerPeriodId,

@@ -65,7 +65,7 @@ class LogService {
   /// Export logs as text
   String exportLogs() {
     final buffer = StringBuffer();
-    buffer.writeln('=== TLU Study Planner Logs ===');
+    buffer.writeln('TLU Study Planner Logs');
     buffer.writeln('Exported: ${DateTime.now()}');
     buffer.writeln('Total entries: ${_logs.length}');
     buffer.writeln('=' * 40);

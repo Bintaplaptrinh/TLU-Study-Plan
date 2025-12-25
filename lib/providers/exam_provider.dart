@@ -245,7 +245,6 @@ class ExamProvider with ChangeNotifier {
         _selectedExamRound,
       );
     }
-    // Note: _isLoading is set to false in fetchExamSchedule
   }
 
   /// Check if there's incomplete cache (for showing resume button)
@@ -260,10 +259,6 @@ class ExamProvider with ChangeNotifier {
     }
   }
 
-  /// Pre-cache ALL exam data on login for full offline mode - PARALLEL VERSION
-  /// EXHAUSTIVE CACHING: Cache every single semester, period, and round
-  /// Uses parallel execution (Future.wait) for maximum speed
-  /// Supports resuming from where it left off if app closes mid-cache
   Future<void> preCacheAllExamData(String accessToken, int currentSemesterId) async {
     _isPreCaching = true;
     _preCacheProgress = 0;
@@ -290,7 +285,6 @@ class ExamProvider with ChangeNotifier {
       _log.log('Already cached ${cachedSemesterIds.length} semesters', level: LogLevel.info);
       
       // Step 1: Fetch ALL available semesters
-      _log.log('═══════════════════════════════════════════', level: LogLevel.info);
       _log.log('Step 1: Fetching ALL semesters...', level: LogLevel.info);
       _preCacheStatus = 'Đang lấy danh sách học kỳ...';
       notifyListeners();
@@ -338,7 +332,6 @@ class ExamProvider with ChangeNotifier {
         final batchEnd = (batchStart + maxConcurrentSemesters).clamp(0, semestersToCache.length);
         final semesterBatch = semestersToCache.sublist(batchStart, batchEnd);
         
-        _log.log('═══════════════════════════════════════════', level: LogLevel.info);
         _log.log('Processing semester batch ${batchStart ~/ maxConcurrentSemesters + 1} (${semesterBatch.length} semesters in parallel)', level: LogLevel.info);
         
         // Process this batch of semesters in parallel
@@ -463,7 +456,7 @@ class ExamProvider with ChangeNotifier {
       );
       
       _log.log('═══════════════════════════════════════════', level: LogLevel.success);
-      _log.log('PARALLEL EXHAUSTIVE CACHING COMPLETE! ⚡', level: LogLevel.success);
+      _log.log('PARALLEL EXHAUSTIVE CACHING COMPLETE', level: LogLevel.success);
       _log.log('Summary:', level: LogLevel.info);
       _log.log('• Semesters cached: ${allSemesters.content.length}', level: LogLevel.info);
       _log.log('• Register periods cached: $totalPeriods', level: LogLevel.info);
@@ -810,8 +803,6 @@ class ExamProvider with ChangeNotifier {
         examRound,
       );
 
-      // CRITICAL: Only update UI if the parameters still match current selection
-      // This prevents background fetches from overwriting data when user has changed selection
       if (_selectedSemesterId == semesterId &&
           _selectedRegisterPeriodId == registerPeriodId &&
           _selectedExamRound == examRound) {

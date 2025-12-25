@@ -3,7 +3,6 @@ import 'package:home_widget/home_widget.dart';
 import 'package:tlustudy_planner/models/api_response.dart';
 import 'package:tlustudy_planner/services/database_helper.dart';
 
-/// Service for managing home screen widget
 class WidgetService {
   static const String androidProviderName = 'TodayScheduleWidgetProvider';
   static const String iOSWidgetKind = 'TodayScheduleWidget';
@@ -17,7 +16,7 @@ class WidgetService {
   }) async {
     try {
       if (kDebugMode) {
-        print('📱 Updating home screen widget...');
+        print('Updating home screen widget...');
       }
 
       // If courses not provided, fetch from database
@@ -47,7 +46,7 @@ class WidgetService {
         final room = course.room.isNotEmpty ? course.room : 'N/A';
         final courseName = course.courseName;
         
-        return 'Tiết $startHour-$endHour: $courseName\n📍 $room';
+        return 'Tiết $startHour-$endHour: $courseName\n - $room';
       }).join('\n\n');
 
       // Save widget data
@@ -64,16 +63,16 @@ class WidgetService {
       );
 
       if (kDebugMode) {
-        print('✅ Widget updated successfully with $courseCount courses');
+        print('Widget updated successfully with $courseCount courses');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error updating widget: $e');
+        print('Error updating widget: $e');
       }
     }
   }
 
-  /// Update widget with empty state (no classes today)
+  /// Update widget with empty state (no classes in - today)
   Future<void> _updateWidgetWithEmptyState() async {
     final now = DateTime.now();
     final weekdayNames = ['', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
@@ -83,7 +82,7 @@ class WidgetService {
     await HomeWidget.saveWidgetData<String>('widget_title', 'Lịch học hôm nay');
     await HomeWidget.saveWidgetData<String>('widget_date', todayDate);
     await HomeWidget.saveWidgetData<int>('course_count', 0);
-    await HomeWidget.saveWidgetData<String>('courses_text', 'Không có lịch học\n\n🎉 Hôm nay bạn rảnh!');
+    await HomeWidget.saveWidgetData<String>('courses_text', 'Không có lịch học\n\n hôm nay');
     await HomeWidget.saveWidgetData<String>('last_update', DateTime.now().toIso8601String());
 
     await HomeWidget.updateWidget(
@@ -92,7 +91,7 @@ class WidgetService {
     );
 
     if (kDebugMode) {
-      print('✅ Widget updated with empty state');
+      print('Widget updated with empty state');
     }
   }
 
@@ -101,7 +100,7 @@ class WidgetService {
     try {
       if (semesterId == null) {
         if (kDebugMode) {
-          print('⚠️ No semester ID provided for widget');
+          print('No semester ID provided for widget');
         }
         return null;
       }
@@ -121,7 +120,7 @@ class WidgetService {
       return todayCourses;
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error fetching today schedule: $e');
+        print('Error fetching today schedule: $e');
       }
       return null;
     }
@@ -142,11 +141,11 @@ class WidgetService {
       await updateWidget();
 
       if (kDebugMode) {
-        print('✅ Widget initialized successfully');
+        print('Widget initialized successfully');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error initializing widget: $e');
+        print('Error initializing widget: $e');
       }
     }
   }

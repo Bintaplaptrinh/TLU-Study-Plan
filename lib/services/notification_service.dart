@@ -21,7 +21,7 @@ class NotificationService {
 
     // Initialize timezone database
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Bangkok')); // Vietnam timezone
+    tz.setLocalLocation(tz.getLocation('Asia/Bangkok'));
 
     // Android initialization settings
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');

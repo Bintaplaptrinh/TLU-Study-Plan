@@ -18,10 +18,8 @@ class ExampleIntegration extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // ✅ ADD THIS: Cache progress banner at the top
           const CacheProgressBanner(),
           
-          // Your existing screen content
           Expanded(
             child: ListView(
               children: [
@@ -34,23 +32,19 @@ class ExampleIntegration extends StatelessWidget {
                 ListTile(
                   title: const Text('Lịch thi'),
                   onTap: () {
-                    // Navigate to exam screen
                   },
                 ),
-                // ... more menu items
               ],
             ),
           ),
         ],
       ),
       
-      // ✅ ADD THIS: Resume button (shows only if caching incomplete)
       floatingActionButton: const ResumeCachingButton(),
     );
   }
 }
 
-/// Alternative: Banner can also be placed in a Stack for overlay effect
 class ExampleWithOverlay extends StatelessWidget {
   const ExampleWithOverlay({Key? key}) : super(key: key);
 
@@ -62,10 +56,8 @@ class ExampleWithOverlay extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // Your main content
           YourMainContent(),
           
-          // ✅ Floating banner at the top
           Positioned(
             top: 0,
             left: 0,
@@ -97,7 +89,6 @@ class YourMainContent extends StatelessWidget {
   }
 }
 
-/// Example: Manually trigger caching with a button
 class ManualCacheButton extends StatelessWidget {
   const ManualCacheButton({Key? key}) : super(key: key);
 
@@ -105,7 +96,6 @@ class ManualCacheButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ExamProvider>(
       builder: (context, examProvider, child) {
-        // Don't show if already caching
         if (examProvider.isPreCaching) {
           return const SizedBox.shrink();
         }
@@ -127,7 +117,7 @@ class ManualCacheButton extends StatelessWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Đã tải xong dữ liệu offline!'),
+                    content: Text('Đã tải xong dữ liệu offline'),
                     backgroundColor: Colors.green,
                   ),
                 );
