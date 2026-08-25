@@ -39,7 +39,7 @@ class NotificationService {
     );
 
     await _notificationsPlugin.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
@@ -260,11 +260,11 @@ class NotificationService {
     _log.log('TZ Scheduled date: $tzScheduledDate', level: LogLevel.debug);
     
     await _notificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzScheduledDate,
-      details,
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: tzScheduledDate,
+      notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: payload,
     );
@@ -274,7 +274,7 @@ class NotificationService {
 
   /// Cancel a specific notification
   Future<void> cancelNotification(int id) async {
-    await _notificationsPlugin.cancel(id);
+    await _notificationsPlugin.cancel(id: id);
   }
 
   /// Cancel all notifications
@@ -311,6 +311,12 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notificationsPlugin.show(id, title, body, details, payload: payload);
+    await _notificationsPlugin.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: payload,
+    );
   }
 }

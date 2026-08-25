@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tlustudy_planner/screens/today_screen.dart';
 import 'package:tlustudy_planner/screens/calendar_screen.dart';
 import 'package:tlustudy_planner/screens/exam_schedule_screen.dart';
-// import 'package:tlustudy_planner/screens/utilities_screen.dart'; // Hidden in this version
+import 'package:tlustudy_planner/screens/utilities_screen.dart';
 import 'package:tlustudy_planner/screens/settings_screen.dart';
 import 'package:tlustudy_planner/widgets/cache_progress_banner.dart';
 import 'package:tlustudy_planner/widgets/cupertino_widgets.dart';
@@ -21,7 +21,7 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
     const TodayScreen(),
     const CalendarScreen(),
     const ExamScheduleScreen(),
-    // const UtilitiesScreen(), // Hidden in this version
+    const UtilitiesScreen(),
     const SettingsScreen(),
   ];
 
@@ -71,7 +71,7 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
           AppTabItem(label: 'Hôm nay', symbol: AppIcons.today),
           AppTabItem(label: 'Lịch học', symbol: AppIcons.calendar),
           AppTabItem(label: 'Lịch thi', symbol: AppIcons.exams),
-          // AppTabItem(label: 'Tiện ích', symbol: AppIcons.utilities), // Hidden in this version
+          AppTabItem(label: 'Tiện ích', symbol: AppIcons.utilities),
           AppTabItem(label: 'Cài đặt', symbol: AppIcons.settings),
         ],
         currentIndex: _selectedIndex,

@@ -19,6 +19,14 @@ class ExamProvider with ChangeNotifier {
   String? _errorMessage;
   String? _roomErrorMessage;
 
+  /// How many exam-room requests may be in flight at once during pre-caching.
+  /// These are pure network waits, so a wide pool cuts the sweep from tens of
+  /// minutes down to a couple.
+  static const int _maxConcurrentRequests = 16;
+
+  /// Exam rounds the portal exposes in its "số lần thi" dropdown.
+  static const List<int> _examRounds = <int>[1, 2, 3, 4, 5];
+
   // Pre-caching progress tracking
   bool _isPreCaching = false;
   int _preCacheProgress = 0; // 0-100 percentage
@@ -259,225 +267,253 @@ class ExamProvider with ChangeNotifier {
     }
   }
 
+  /// Pre-cache every exam schedule the student can see, for full offline use.
+  ///
+  /// Every (semester x register period x exam round) combination is flattened
+  /// into a single task queue and drained by a fixed pool of workers. That
+  /// keeps a constant number of requests in flight instead of stalling on the
+  /// slowest semester in a batch, and lets progress be reported against real
+  /// work done rather than semester count.
+  ///
+  /// Semesters are processed newest-first so the data the student actually
+  /// wants lands early, and already-cached semesters are skipped so an
+  /// interrupted run resumes where it left off.
   Future<void> preCacheAllExamData(String accessToken, int currentSemesterId) async {
     _isPreCaching = true;
     _preCacheProgress = 0;
-    _preCacheStatus = 'Bắt đầu tải dữ liệu offline (đa luồng)...';
+    _preCacheStatus = 'Bắt đầu tải dữ liệu offline...';
     notifyListeners();
-    
-    _log.log('PARALLEL EXHAUSTIVE CACHING MODE - Caching ALL data with multi-threading...', level: LogLevel.info);
+
+    _log.log('Exhaustive exam caching started (pool of $_maxConcurrentRequests)',
+        level: LogLevel.info);
     _log.log('Current semester ID: $currentSemesterId', level: LogLevel.debug);
-    
+
     try {
-      // Check if caching was already complete
-      final isComplete = await _dbHelper.isCacheComplete();
-      if (isComplete) {
-        _log.log('Cache already complete! No need to re-cache.', level: LogLevel.success);
+      if (await _dbHelper.isCacheComplete()) {
+        _log.log('Cache already complete - nothing to do', level: LogLevel.success);
         _isPreCaching = false;
         _preCacheProgress = 100;
         _preCacheStatus = 'Dữ liệu đã được tải đầy đủ';
         notifyListeners();
         return;
       }
-      
-      // Get list of already cached semesters (for resume capability)
-      final cachedSemesterIds = await _dbHelper.getCachedSemesterIds();
-      _log.log('Already cached ${cachedSemesterIds.length} semesters', level: LogLevel.info);
-      
-      // Step 1: Fetch ALL available semesters
-      _log.log('Step 1: Fetching ALL semesters...', level: LogLevel.info);
+
+      // ---- Step 1: every semester -----------------------------------------
       _preCacheStatus = 'Đang lấy danh sách học kỳ...';
       notifyListeners();
-      
+
       final allSemesters = await _authService.getAllSemesters(accessToken);
       _preCacheTotalSemesters = allSemesters.content.length;
-      _log.log('Found $_preCacheTotalSemesters semesters total', level: LogLevel.success);
-      _log.log('Will cache EVERY semester for 100% offline mode!', level: LogLevel.info);
-      
-      // Save all semesters to cache immediately
       await _dbHelper.saveSemesters(allSemesters.content);
-      _log.log('Saved all semesters to cache', level: LogLevel.success);
-      
-      // Filter out already cached semesters (for resume)
+      _log.log('Found $_preCacheTotalSemesters semesters', level: LogLevel.success);
+
+      final cachedSemesterIds = await _dbHelper.getCachedSemesterIds();
       final semestersToCache = allSemesters.content
           .where((sem) => !cachedSemesterIds.contains(sem.id))
-          .toList();
-      
+          .toList()
+        // Newest first: the current semester matters more than 2019's.
+        ..sort((a, b) {
+          if (a.id == currentSemesterId) return -1;
+          if (b.id == currentSemesterId) return 1;
+          return b.startDate.compareTo(a.startDate);
+        });
+
       if (semestersToCache.isEmpty) {
-        _log.log('All semesters already cached!', level: LogLevel.success);
+        _log.log('All semesters already cached', level: LogLevel.success);
         await _dbHelper.updateCacheProgress(
           totalSemesters: _preCacheTotalSemesters,
           cachedSemesters: _preCacheTotalSemesters,
           isComplete: true,
         );
-        
         _isPreCaching = false;
         _preCacheProgress = 100;
         _preCacheStatus = 'Hoàn tất! Tất cả dữ liệu đã sẵn sàng';
         notifyListeners();
         return;
       }
-      
-      _log.log('Need to cache ${semestersToCache.length} remaining semesters', level: LogLevel.info);
-      
-      int totalPeriods = 0;
-      int totalRounds = 0;
-      int totalRooms = 0;
-      
-      // Step 2: Cache EVERY REMAINING SEMESTER IN PARALLEL
-      // Process semesters concurrently (up to 5 at a time to avoid overwhelming server)
-      const int maxConcurrentSemesters = 5;
-      
-      for (int batchStart = 0; batchStart < semestersToCache.length; batchStart += maxConcurrentSemesters) {
-        final batchEnd = (batchStart + maxConcurrentSemesters).clamp(0, semestersToCache.length);
-        final semesterBatch = semestersToCache.sublist(batchStart, batchEnd);
-        
-        _log.log('Processing semester batch ${batchStart ~/ maxConcurrentSemesters + 1} (${semesterBatch.length} semesters in parallel)', level: LogLevel.info);
-        
-        // Process this batch of semesters in parallel
-        final batchFutures = semesterBatch.asMap().entries.map((entry) async {
-          final localIndex = entry.key;
-          final globalIndex = batchStart + localIndex;
-          final sem = entry.value;
-          final semesterNumber = cachedSemesterIds.length + globalIndex + 1;
-          
-          _log.log('→ [Thread ${localIndex + 1}] Starting semester: ${sem.semesterName} (ID: ${sem.id})', level: LogLevel.debug);
-          
-          try {
-            // Fetch and cache register periods for this semester
-            _log.log('→ [Thread ${localIndex + 1}] Fetching register periods for ${sem.semesterName}...', level: LogLevel.debug);
-            final periods = await _authService.getRegisterPeriods(
-              accessToken,
-              sem.id,
-            );
-            await _dbHelper.saveRegisterPeriods(sem.id, periods);
-            
-            final semTotalPeriods = periods.length;
-            _log.log('→ [Thread ${localIndex + 1}] Cached ${periods.length} periods for ${sem.semesterName}', level: LogLevel.success);
-            
-            int semTotalRounds = 0;
-            int semTotalRooms = 0;
-            
-            // For EVERY register period, cache ALL 5 exam rounds IN PARALLEL
-            for (int j = 0; j < periods.length; j++) {
-              final period = periods[j];
-              
-              _log.log('→ [Thread ${localIndex + 1}] Period ${j + 1}/$semTotalPeriods: ${period.name}', level: LogLevel.debug);
-              
-              // Fetch all 5 rounds for this period in parallel
-              final roundFutures = List.generate(5, (roundIndex) {
-                final round = roundIndex + 1;
-                return _authService.getStudentExamRooms(
-                  accessToken,
-                  sem.id,
-                  period.id,
-                  round,
-                ).then((rooms) async {
-                  await _dbHelper.saveExamRooms(
-                    sem.id,
-                    period.id,
-                    round,
-                    rooms,
-                  );
-                  return {'round': round, 'rooms': rooms.length, 'success': true};
-                }).catchError((e) {
-                  _log.log('→ [Thread ${localIndex + 1}] Round $round failed: ${e.toString().substring(0, min(50, e.toString().length))}...', level: LogLevel.warning);
-                  return {'round': round, 'rooms': 0, 'success': false};
-                });
-              });
-              
-              // Wait for all 5 rounds to complete
-              final roundResults = await Future.wait(roundFutures);
-              
-              for (var result in roundResults) {
-                if (result['success'] == true) {
-                  semTotalRounds++;
-                  semTotalRooms += result['rooms'] as int;
-                  if (result['rooms'] as int > 0) {
-                    _log.log('→ [Thread ${localIndex + 1}] Round ${result['round']}: ${result['rooms']} room(s)', level: LogLevel.success);
-                  }
-                }
-              }
+
+      _log.log('${semestersToCache.length} semesters left to cache',
+          level: LogLevel.info);
+
+      // ---- Step 2: register periods, all semesters in parallel -------------
+      _preCacheStatus = 'Đang lấy các đợt học...';
+      notifyListeners();
+
+      final periodsBySemester = <int, List<RegisterPeriod>>{};
+      var periodsDone = 0;
+
+      await _runPool(
+        semestersToCache.map((sem) {
+          return () async {
+            try {
+              final periods =
+                  await _authService.getRegisterPeriods(accessToken, sem.id);
+              await _dbHelper.saveRegisterPeriods(sem.id, periods);
+              periodsBySemester[sem.id] = periods;
+            } catch (e) {
+              _log.log('Register periods failed for ${sem.semesterName}: $e',
+                  level: LogLevel.warning);
+              periodsBySemester[sem.id] = const <RegisterPeriod>[];
             }
-            
-            _log.log('→ [Thread ${localIndex + 1}] ✓ Semester ${sem.semesterName} complete! ($semTotalPeriods periods, $semTotalRounds rounds, $semTotalRooms rooms)', level: LogLevel.success);
-            
-            return {
-              'semester': sem.semesterName,
-              'semesterNumber': semesterNumber,
-              'periods': semTotalPeriods,
-              'rounds': semTotalRounds,
-              'rooms': semTotalRooms,
-              'success': true,
-            };
-            
-          } catch (e) {
-            _log.log('→ [Thread ${localIndex + 1}] ✗ Failed to cache semester ${sem.semesterName}: $e', level: LogLevel.error);
-            return {
-              'semester': sem.semesterName,
-              'semesterNumber': semesterNumber,
-              'success': false,
-            };
-          }
-        });
-        
-        // Wait for all semesters in this batch to complete
-        final batchResults = await Future.wait(batchFutures);
-        
-        // Aggregate results and update progress
-        for (var result in batchResults) {
-          if (result['success'] == true) {
-            totalPeriods += result['periods'] as int;
-            totalRounds += result['rounds'] as int;
-            totalRooms += result['rooms'] as int;
-            
-            _preCacheCurrentSemester = result['semesterNumber'] as int;
-            _preCacheProgress = ((_preCacheCurrentSemester - 1) * 100 / _preCacheTotalSemesters).round();
-            _preCacheStatus = 'Đã hoàn thành: ${result['semester']} ($_preCacheCurrentSemester/$_preCacheTotalSemesters)';
-            
-            // Update database progress
-            await _dbHelper.updateCacheProgress(
-              totalSemesters: _preCacheTotalSemesters,
-              cachedSemesters: _preCacheCurrentSemester,
-              isComplete: false,
-            );
+          };
+        }).toList(),
+        onEach: () {
+          periodsDone++;
+          // Fetching periods is roughly the first tenth of the work.
+          _preCacheProgress =
+              (periodsDone * 10 / semestersToCache.length).round();
+          _preCacheStatus =
+              'Đợt học: $periodsDone/${semestersToCache.length} học kỳ';
+          notifyListeners();
+        },
+      );
+
+      _preCacheTotalPeriods =
+          periodsBySemester.values.fold(0, (sum, list) => sum + list.length);
+      _log.log('Cached $_preCacheTotalPeriods register periods',
+          level: LogLevel.success);
+
+      // ---- Step 3: flatten (semester x period x round) into one queue ------
+      final tasks = <_ExamCacheTask>[];
+      for (final sem in semestersToCache) {
+        final periods = periodsBySemester[sem.id] ?? const <RegisterPeriod>[];
+        for (final period in periods) {
+          for (final round in _examRounds) {
+            tasks.add(_ExamCacheTask(sem, period, round));
           }
         }
-        
-        notifyListeners();
-        _log.log('Batch ${batchStart ~/ maxConcurrentSemesters + 1} complete! Total so far: $totalPeriods periods, $totalRounds rounds, $totalRooms rooms', level: LogLevel.success);
       }
-      
-      // Mark caching as complete
+
+      if (tasks.isEmpty) {
+        _log.log('No register periods found - nothing further to cache',
+            level: LogLevel.warning);
+      }
+
+      _log.log('Queued ${tasks.length} exam-room requests', level: LogLevel.info);
+
+      var completed = 0;
+      var totalRooms = 0;
+      var roundsWithData = 0;
+
+      // Count tasks per semester so the UI can report semester-level progress
+      // as each semester's last request lands.
+      final remainingBySemester = <int, int>{};
+      for (final task in tasks) {
+        remainingBySemester.update(
+          task.semester.id,
+          (n) => n + 1,
+          ifAbsent: () => 1,
+        );
+      }
+      final finishedSemesters = <int>{};
+
+      await _runPool(
+        tasks.map((task) {
+          return () async {
+            try {
+              final rooms = await _authService.getStudentExamRooms(
+                accessToken,
+                task.semester.id,
+                task.period.id,
+                task.round,
+              );
+              await _dbHelper.saveExamRooms(
+                task.semester.id,
+                task.period.id,
+                task.round,
+                rooms,
+              );
+              if (rooms.isNotEmpty) {
+                roundsWithData++;
+                totalRooms += rooms.length;
+                _log.log(
+                  '${task.semester.semesterName} | ${task.period.name} | '
+                  'lần ${task.round} -> ${rooms.length} phòng',
+                  level: LogLevel.success,
+                );
+              }
+            } catch (e) {
+              // A missing combination is normal - most rounds have no exams.
+              _log.log(
+                'Exam rooms ${task.semester.semesterName}/${task.period.name}/'
+                'lần ${task.round} failed: $e',
+                level: LogLevel.debug,
+              );
+            } finally {
+              final left = (remainingBySemester[task.semester.id] ?? 1) - 1;
+              remainingBySemester[task.semester.id] = left;
+              if (left <= 0) {
+                finishedSemesters.add(task.semester.id);
+              }
+            }
+          };
+        }).toList(),
+        onEach: () {
+          completed++;
+          // Remaining 90% of the bar covers the exam-room sweep.
+          _preCacheProgress = 10 + (completed * 90 / tasks.length).round();
+          _preCacheCurrentPeriod = completed;
+          _preCacheStatus = 'Đang tải lịch thi: $completed/${tasks.length}';
+
+          // Report semester-level progress as each semester's tasks finish.
+          _preCacheCurrentSemester =
+              cachedSemesterIds.length + finishedSemesters.length;
+          notifyListeners();
+        },
+      );
+
       await _dbHelper.updateCacheProgress(
         totalSemesters: _preCacheTotalSemesters,
         cachedSemesters: _preCacheTotalSemesters,
         isComplete: true,
       );
-      
-      _log.log('═══════════════════════════════════════════', level: LogLevel.success);
-      _log.log('PARALLEL EXHAUSTIVE CACHING COMPLETE', level: LogLevel.success);
-      _log.log('Summary:', level: LogLevel.info);
-      _log.log('• Semesters cached: ${allSemesters.content.length}', level: LogLevel.info);
-      _log.log('• Register periods cached: $totalPeriods', level: LogLevel.info);
-      _log.log('• Exam rounds cached: $totalRounds', level: LogLevel.info);
-      _log.log('• Total exam rooms: $totalRooms', level: LogLevel.info);
-      _log.log('• Used parallel execution (up to 5 semesters × 5 rounds = 25 concurrent requests)', level: LogLevel.info);
-      _log.log('App now works 100% offline - even for 100 years!', level: LogLevel.success);
-      _log.log('═══════════════════════════════════════════', level: LogLevel.success);
-      
+
+      _log.log('═══ Exam caching complete ═══', level: LogLevel.success);
+      _log.log('• Semesters: ${allSemesters.content.length}', level: LogLevel.info);
+      _log.log('• Register periods: $_preCacheTotalPeriods', level: LogLevel.info);
+      _log.log('• Requests made: ${tasks.length}', level: LogLevel.info);
+      _log.log('• Combinations with data: $roundsWithData', level: LogLevel.info);
+      _log.log('• Exam rooms cached: $totalRooms', level: LogLevel.info);
+
       _isPreCaching = false;
       _preCacheProgress = 100;
+      _preCacheCurrentSemester = _preCacheTotalSemesters;
       _preCacheStatus = 'Hoàn tất! Ứng dụng có thể hoạt động offline';
       notifyListeners();
-      
     } catch (e) {
       _log.log('Pre-caching failed: $e', level: LogLevel.error);
       _isPreCaching = false;
       _preCacheStatus = 'Lỗi: $e';
       notifyListeners();
-      // Don't throw - app should still work even if pre-caching fails
+      // Don't throw - the app still works without a complete cache.
     }
+  }
+
+  /// Drains [tasks] with at most [_maxConcurrentRequests] running at once.
+  ///
+  /// Dart's event loop is single-threaded, so the shared cursor needs no lock:
+  /// no `await` sits between reading and incrementing it.
+  Future<void> _runPool(
+    List<Future<void> Function()> tasks, {
+    void Function()? onEach,
+  }) async {
+    if (tasks.isEmpty) return;
+
+    var next = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        final index = next;
+        if (index >= tasks.length) return;
+        next = index + 1;
+
+        await tasks[index]();
+        onEach?.call();
+      }
+    }
+
+    final workerCount = min(_maxConcurrentRequests, tasks.length);
+    await Future.wait(List.generate(workerCount, (_) => worker()));
   }
   
   /// Pre-cache all exam rounds in background for offline use
@@ -921,4 +957,15 @@ class ExamProvider with ChangeNotifier {
     
     return true;
   }
+}
+
+/// One (semester x register period x exam round) request in the pre-cache
+/// sweep. Flattening the three nested loops into records like this is what
+/// lets a single worker pool keep every connection busy.
+class _ExamCacheTask {
+  final Semester semester;
+  final RegisterPeriod period;
+  final int round;
+
+  const _ExamCacheTask(this.semester, this.period, this.round);
 }

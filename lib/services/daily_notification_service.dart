@@ -63,7 +63,7 @@ class DailyNotificationService {
       _log.log('Android: Daily notification check cancelled', level: LogLevel.warning);
     } else if (Platform.isIOS) {
       final notificationsPlugin = FlutterLocalNotificationsPlugin();
-      await notificationsPlugin.cancel(_iosNotificationId);
+      await notificationsPlugin.cancel(id: _iosNotificationId);
       _log.log('iOS: Daily notification check cancelled', level: LogLevel.warning);
     }
   }
@@ -89,15 +89,15 @@ class DailyNotificationService {
       iOS: iosSettings,
     );
     
-    await notificationsPlugin.initialize(initSettings);
+    await notificationsPlugin.initialize(settings: initSettings);
 
     // Schedule daily notification
     await notificationsPlugin.zonedSchedule(
-      _iosNotificationId,
-      'Lịch học hôm nay',
-      'Nhấn để xem lịch học và thi hôm nay',
-      _nextInstanceOfTime(hour, minute),
-      const NotificationDetails(
+      id: _iosNotificationId,
+      title: 'Lịch học hôm nay',
+      body: 'Nhấn để xem lịch học và thi hôm nay',
+      scheduledDate: _nextInstanceOfTime(hour, minute),
+      notificationDetails: const NotificationDetails(
         iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
@@ -148,7 +148,7 @@ Future<void> _performDailyCheck() async {
 
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
   const initSettings = InitializationSettings(android: androidSettings);
-  await notificationsPlugin.initialize(initSettings);
+  await notificationsPlugin.initialize(settings: initSettings);
 
   // Get today's date
   final today = DateTime.now();
@@ -331,10 +331,10 @@ Future<void> _sendDailySummaryNotification(
   );
 
   await plugin.show(
-    99999, // Unique ID for daily summary
-    title,
-    body,
-    notificationDetailsWithBigText,
+    id: 99999, // Unique ID for daily summary
+    title: title,
+    body: body,
+    notificationDetails: notificationDetailsWithBigText,
   );
 
   final log = LogService();

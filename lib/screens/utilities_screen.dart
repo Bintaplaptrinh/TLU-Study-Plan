@@ -20,7 +20,10 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
   bool _isLoadingMarks = false;
   bool _isLoadingBehavior = false;
   bool _isLoadingTuition = false;
-  int _selectedTab = 0; // 0: Điểm, 1: Rèn luyện, 2: Học phí
+  int _selectedTab = 0; // 0: Điểm, 1: Rèn luyện, 2: Học phí, 3: CTĐT
+
+  // Knowledge blocks collapsed by default - the program runs to ~90 subjects.
+  final Set<String> _expandedBlocks = <String>{};
   String? _marksError;
   String? _behaviorError;
   String? _tuitionError;
@@ -45,6 +48,9 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
     final userProvider = context.read<UserProvider>();
 
     if (!mounted) return;
+
+    // Served from SQLite when already cached, so this is usually instant.
+    userProvider.fetchEducationProgram();
 
     // Load marks for ALL semesters
     setState(() {
@@ -239,11 +245,7 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _selectedTab == 0
-                              ? '${_marksBySemester.length} học kỳ có điểm'
-                              : _selectedTab == 1
-                                  ? '${_behaviorMarks.length} bản ghi rèn luyện'
-                                  : '${_tuitionData.length} bản ghi học phí',
+                          _tabSubtitle(userProvider),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface.withOpacity(0.6),
                           ),
@@ -258,31 +260,20 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
 
           // Tab selector
           SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+            // Four tabs no longer fit as equal columns on narrow phones, so
+            // the row scrolls instead of squeezing the labels.
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Expanded(
-                    child: _buildTabButton(0, 'Điểm số', Icons.grade, theme),
-                  ),
+                  _buildTabButton(0, 'Điểm số', Icons.grade, theme),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildTabButton(
-                      1,
-                      'Rèn luyện',
-                      Icons.emoji_events,
-                      theme,
-                    ),
-                  ),
+                  _buildTabButton(1, 'Rèn luyện', Icons.emoji_events, theme),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildTabButton(
-                      2,
-                      'Học phí',
-                      Icons.payment,
-                      theme,
-                    ),
-                  ),
+                  _buildTabButton(2, 'Học phí', Icons.payment, theme),
+                  const SizedBox(width: 8),
+                  _buildTabButton(3, 'CTĐT', Icons.account_tree, theme),
                 ],
               ),
             ),
@@ -294,6 +285,7 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
           if (_selectedTab == 0) _buildMarksContent(theme),
           if (_selectedTab == 1) _buildBehaviorMarksContent(theme),
           if (_selectedTab == 2) _buildTuitionContent(theme),
+          if (_selectedTab == 3) _buildEducationProgramContent(theme, userProvider),
 
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
@@ -310,7 +302,7 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
           color: isSelected
               ? AppTheme.accentColor
@@ -324,6 +316,7 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
           ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
@@ -332,15 +325,13 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
               color: isSelected ? Colors.black : theme.colorScheme.onSurface,
             ),
             const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? Colors.black : theme.colorScheme.onSurface,
-                ),
-                overflow: TextOverflow.ellipsis,
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.black : theme.colorScheme.onSurface,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -570,6 +561,308 @@ class _UtilitiesScreenState extends State<UtilitiesScreen>
           return _buildTuitionCard(tuition, theme);
         },
         childCount: _tuitionData.length,
+      ),
+    );
+  }
+
+  /// One-line summary under the student's name, matching the active tab.
+  String _tabSubtitle(UserProvider userProvider) {
+    switch (_selectedTab) {
+      case 0:
+        return '${_marksBySemester.length} học kỳ có điểm';
+      case 1:
+        return '${_behaviorMarks.length} bản ghi rèn luyện';
+      case 2:
+        return '${_tuitionData.length} bản ghi học phí';
+      case 3:
+        final count = userProvider.educationProgram.length;
+        if (count == 0) return 'Chương trình đào tạo';
+        return '$count học phần · ${userProvider.educationProgramCredits} tín chỉ';
+      default:
+        return '';
+    }
+  }
+
+  Widget _buildEducationProgramContent(
+    ThemeData theme,
+    UserProvider userProvider,
+  ) {
+    if (userProvider.isLoadingEducationProgram &&
+        userProvider.educationProgram.isEmpty) {
+      return const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final grouped = userProvider.educationProgramByBlock;
+
+    if (grouped.isEmpty) {
+      return SliverFillRemaining(
+        child: _buildEmptyState(
+          'Chưa có chương trình đào tạo',
+          'Chương trình đào tạo sẽ hiển thị sau khi đồng bộ dữ liệu',
+          Icons.account_tree,
+        ),
+      );
+    }
+
+    final blocks = grouped.keys.toList();
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          // Row 0 is the summary card; the rest are knowledge blocks.
+          if (index == 0) {
+            return _buildProgramSummary(userProvider, blocks.length, theme);
+          }
+
+          final block = blocks[index - 1];
+          final subjects = grouped[block]!;
+          return _buildKnowledgeBlock(block, subjects, theme);
+        },
+        childCount: blocks.length + 1,
+      ),
+    );
+  }
+
+  Widget _buildProgramSummary(
+    UserProvider userProvider,
+    int blockCount,
+    ThemeData theme,
+  ) {
+    final subjects = userProvider.educationProgram;
+    final electives = subjects.where((s) => !s.isRequired).length;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          _buildProgramStat(
+            '${userProvider.educationProgramCredits}',
+            'Tín chỉ',
+            theme,
+          ),
+          _buildProgramStat('${subjects.length}', 'Học phần', theme),
+          _buildProgramStat('$blockCount', 'Khối KT', theme),
+          if (electives > 0) _buildProgramStat('$electives', 'Tự chọn', theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgramStat(String value, String label, ThemeData theme) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKnowledgeBlock(
+    String block,
+    List<ProgramSubject> subjects,
+    ThemeData theme,
+  ) {
+    final isExpanded = _expandedBlocks.contains(block);
+    final credits = totalProgramCredits(subjects);
+    final category = subjects.first.category;
+    final categoryColor = _categoryColor(category, theme);
+
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              if (isExpanded) {
+                _expandedBlocks.remove(block);
+              } else {
+                _expandedBlocks.add(block);
+              }
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.folder_outlined,
+                    color: AppTheme.primaryColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subjects.first.blockTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${subjects.length} học phần · $credits tín chỉ',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (category.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: categoryColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      category,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: categoryColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isExpanded)
+          ...subjects.map((subject) => _buildProgramSubjectRow(subject, theme)),
+      ],
+    );
+  }
+
+  /// Colour for the requirement badge: electives and certificates read as
+  /// "optional-ish", required blocks as the primary accent.
+  Color _categoryColor(String category, ThemeData theme) {
+    final lower = category.toLowerCase();
+    if (lower.contains('tự chọn')) return Colors.orange.shade700;
+    if (lower.contains('chứng chỉ')) return Colors.blueGrey;
+    return AppTheme.primaryColor;
+  }
+
+  Widget _buildProgramSubjectRow(ProgramSubject subject, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(28, 3, 16, 3),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  subject.subjectName.isEmpty
+                      ? subject.subjectCode
+                      : subject.subjectName,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (subject.subjectCode.isNotEmpty) ...[
+                      Text(
+                        subject.subjectCode,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    if (subject.semesterLabel.isNotEmpty)
+                      Text(
+                        'HK ${subject.semesterLabel}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${subject.credits} TC',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

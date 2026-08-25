@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4, // Version 4: Add exam_round_cache_metadata table
+      version: 5, // Version 5: Add education_program table
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -108,6 +108,23 @@ class DatabaseHelper {
           lastCached INTEGER NOT NULL,
           UNIQUE(semesterId, registerPeriodId, examRound)
         )
+      ''');
+    }
+
+    if (oldVersion < 5) {
+      // Add the education program (chương trình đào tạo) table
+      await db.execute('''
+      CREATE TABLE education_program (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        knowledgeBlock TEXT NOT NULL,
+        subjectCode TEXT NOT NULL,
+        subjectName TEXT NOT NULL,
+        credits INTEGER NOT NULL DEFAULT 0,
+        semesterLabel TEXT,
+        isRequired INTEGER NOT NULL DEFAULT 1,
+        orderIndex INTEGER NOT NULL DEFAULT 0,
+        lastUpdated INTEGER NOT NULL
+      )
       ''');
     }
   }
@@ -273,6 +290,21 @@ class DatabaseHelper {
         UNIQUE(semesterId, registerPeriodId, examRound)
       )
     ''');
+    // Education program table (chương trình đào tạo)
+    await db.execute('''
+      CREATE TABLE education_program (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        knowledgeBlock TEXT NOT NULL,
+        subjectCode TEXT NOT NULL,
+        subjectName TEXT NOT NULL,
+        credits INTEGER NOT NULL DEFAULT 0,
+        semesterLabel TEXT,
+        isRequired INTEGER NOT NULL DEFAULT 1,
+        orderIndex INTEGER NOT NULL DEFAULT 0,
+        lastUpdated INTEGER NOT NULL
+      )
+    ''');
+
   }
 
   // Save TLU user
@@ -583,6 +615,51 @@ class DatabaseHelper {
         .toList();
   }
 
+  // Save the student's education program, replacing whatever was cached.
+  Future<void> saveEducationProgram(List<ProgramSubject> subjects) async {
+    final db = await database;
+    await db.delete('education_program');
+
+    final batch = db.batch();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    for (var i = 0; i < subjects.length; i++) {
+      final subject = subjects[i];
+      batch.insert('education_program', {
+        'knowledgeBlock': subject.knowledgeBlock,
+        'subjectCode': subject.subjectCode,
+        'subjectName': subject.subjectName,
+        'credits': subject.credits,
+        'semesterLabel': subject.semesterLabel,
+        'isRequired': subject.isRequired ? 1 : 0,
+        // Preserve the portal's ordering; it groups by knowledge block.
+        'orderIndex': i,
+        'lastUpdated': now,
+      });
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  // Get the cached education program in its original order
+  Future<List<ProgramSubject>> getEducationProgram() async {
+    final db = await database;
+    final maps = await db.query('education_program', orderBy: 'orderIndex');
+
+    return maps
+        .map(
+          (map) => ProgramSubject(
+            knowledgeBlock: map['knowledgeBlock'] as String? ?? '',
+            subjectCode: map['subjectCode'] as String? ?? '',
+            subjectName: map['subjectName'] as String? ?? '',
+            credits: (map['credits'] as int?) ?? 0,
+            semesterLabel: map['semesterLabel'] as String? ?? '',
+            isRequired: ((map['isRequired'] as int?) ?? 1) == 1,
+          ),
+        )
+        .toList();
+  }
+
   // Clear all data
   Future<void> clearAllData() async {
     final db = await database;
@@ -593,6 +670,7 @@ class DatabaseHelper {
     await db.delete('school_years');
     await db.delete('register_periods');
     await db.delete('exam_rooms');
+    await db.delete('education_program');
   }
 
   // Save register periods for a semester

@@ -855,6 +855,68 @@ class SemesterListResponse {
 }
 
 /// StudentExamRoom represents a student's exam room assignment
+/// Returns the first usable value found by walking [paths] (dot-separated)
+/// through [json].
+///
+/// The TLU portal moves fields between nesting levels between endpoints and
+/// releases - `subjectName` may sit at the root, under `subject`, or under
+/// `semesterSubject.subject`. Listing the known shapes here keeps a row
+/// populated instead of silently rendering blank when the API shifts.
+dynamic _dig(Map<String, dynamic>? json, List<String> paths) {
+  if (json == null) return null;
+
+  for (final path in paths) {
+    dynamic current = json;
+    var ok = true;
+
+    for (final key in path.split('.')) {
+      if (current is Map && current[key] != null) {
+        current = current[key];
+      } else {
+        ok = false;
+        break;
+      }
+    }
+
+    if (ok && current != null && current != '') return current;
+  }
+  return null;
+}
+
+/// [_dig] coerced to a String, falling back to [defaultValue].
+String _digString(
+  Map<String, dynamic>? json,
+  List<String> paths, {
+  String defaultValue = '',
+}) {
+  final value = _dig(json, paths);
+  if (value == null) return defaultValue;
+  return value is String ? value : value.toString();
+}
+
+/// [_dig] coerced to a String or null (no empty-string placeholder).
+String? _digStringOrNull(Map<String, dynamic>? json, List<String> paths) {
+  final value = _dig(json, paths);
+  if (value == null) return null;
+  return value is String ? value : value.toString();
+}
+
+/// [_dig] coerced to an int, tolerating numeric strings and doubles.
+int? _digInt(Map<String, dynamic>? json, List<String> paths) {
+  final value = _dig(json, paths);
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
+/// Reads a nested object at the first path that holds a Map.
+Map<String, dynamic>? _digMap(Map<String, dynamic>? json, List<String> paths) {
+  final value = _dig(json, paths);
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return null;
+}
+
 class StudentExamRoom {
   final int id;
   final int status;
@@ -881,19 +943,44 @@ class StudentExamRoom {
   });
 
   factory StudentExamRoom.fromJson(Map<String, dynamic> json) {
+    final examRoom = _digMap(json, [
+      'examRoom',
+      'semesterSubjectExamRoom',
+      'room',
+    ]);
+
     return StudentExamRoom(
-      id: json['id'] ?? 0,
-      status: json['status'] ?? 0,
-      examCode: json['examCode'],
-      examCodeNumber: json['examCodeNumber'],
-      markingCode: json['markingCode'],
-      examPeriodCode: json['examPeriodCode'] ?? '',
-      subjectName: json['subjectName'] ?? '',
-      studentCode: json['studentCode'],
-      examRound: json['examRound'],
-      examRoom: json['examRoom'] != null
-          ? ExamRoomDetail.fromJson(json['examRoom'])
-          : null,
+      id: _digInt(json, ['id']) ?? 0,
+      status: _digInt(json, ['status']) ?? 0,
+      examCode: _digStringOrNull(json, [
+        'examCode',
+        'studentExamCode',
+        'candidateNumber',
+        'soBaoDanh',
+      ]),
+      examCodeNumber: _digInt(json, ['examCodeNumber', 'examCodeNo']),
+      markingCode: _digStringOrNull(json, ['markingCode', 'markCode']),
+      examPeriodCode: _digString(json, [
+        'examPeriodCode',
+        'examPeriod.code',
+        'examPeriod.name',
+        'semesterSubjectExam.name',
+        'examPeriodName',
+      ]),
+      subjectName: _digString(json, [
+        'subjectName',
+        'subject.subjectName',
+        'semesterSubject.subject.subjectName',
+        'courseSubject.subjectName',
+        'subject.name',
+      ]),
+      studentCode: _digStringOrNull(json, [
+        'studentCode',
+        'student.studentCode',
+        'student.code',
+      ]),
+      examRound: _digInt(json, ['examRound', 'round', 'examTime']),
+      examRoom: examRoom != null ? ExamRoomDetail.fromJson(examRoom) : null,
     );
   }
 }
@@ -927,20 +1014,47 @@ class ExamRoomDetail {
   });
 
   factory ExamRoomDetail.fromJson(Map<String, dynamic> json) {
+    final examHour = _digMap(json, [
+      'examHour',
+      'examCourseHour',
+      'courseHour',
+    ]);
+    final room = _digMap(json, ['room', 'roomInfo']);
+
     return ExamRoomDetail(
-      id: json['id'] ?? 0,
-      roomCode: json['roomCode'] ?? '',
-      duration: json['duration'],
-      examDate: json['examDate'],
-      examDateString: json['examDateString'],
-      numberExpectedStudent: json['numberExpectedStudent'],
-      semesterName: json['semesterName'],
-      courseYearName: json['courseYearName'],
-      registerPeriodName: json['registerPeriodName'],
-      examHour: json['examHour'] != null
-          ? ExamHour.fromJson(json['examHour'])
-          : null,
-      room: json['room'] != null ? Room.fromJson(json['room']) : null,
+      id: _digInt(json, ['id']) ?? 0,
+      // Fall back to the room's own code/name so a row never renders
+      // room-less just because the portal dropped the flattened field.
+      roomCode: _digString(json, [
+        'roomCode',
+        'room.code',
+        'room.name',
+        'roomName',
+      ]),
+      duration: _digInt(json, ['duration', 'examDuration']),
+      examDate: _digInt(json, ['examDate', 'dateExam', 'examRoom.examDate']),
+      examDateString: _digStringOrNull(json, [
+        'examDateString',
+        'examDateStr',
+      ]),
+      numberExpectedStudent: _digInt(json, [
+        'numberExpectedStudent',
+        'numberOfStudent',
+      ]),
+      semesterName: _digStringOrNull(json, [
+        'semesterName',
+        'semester.semesterName',
+      ]),
+      courseYearName: _digStringOrNull(json, [
+        'courseYearName',
+        'schoolYear.name',
+      ]),
+      registerPeriodName: _digStringOrNull(json, [
+        'registerPeriodName',
+        'registerPeriod.name',
+      ]),
+      examHour: examHour != null ? ExamHour.fromJson(examHour) : null,
+      room: room != null ? Room.fromJson(room) : null,
     );
   }
 }
@@ -963,11 +1077,11 @@ class ExamHour {
 
   factory ExamHour.fromJson(Map<String, dynamic> json) {
     return ExamHour(
-      id: json['id'] ?? 0,
-      startString: json['startString'],
-      endString: json['endString'],
-      name: json['name'],
-      code: json['code'],
+      id: _digInt(json, ['id']) ?? 0,
+      startString: _digStringOrNull(json, ['startString', 'start', 'gioThi']),
+      endString: _digStringOrNull(json, ['endString', 'end']),
+      name: _digStringOrNull(json, ['name', 'caThi']),
+      code: _digStringOrNull(json, ['code']),
     );
   }
 }
@@ -982,9 +1096,9 @@ class Room {
 
   factory Room.fromJson(Map<String, dynamic> json) {
     return Room(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? '',
-      code: json['code'] ?? '',
+      id: _digInt(json, ['id']) ?? 0,
+      name: _digString(json, ['name', 'roomName', 'code']),
+      code: _digString(json, ['code', 'roomCode', 'name']),
     );
   }
 }
@@ -1151,3 +1265,164 @@ class StudentTuition {
     );
   }
 }
+
+/// One course in the student's education program (chương trình đào tạo).
+///
+/// The portal returns the program as a tree: inner nodes are knowledge blocks
+/// (khối kiến thức) and leaves are the actual courses. [fromTree] flattens
+/// that into a list, carrying each leaf's block name down with it.
+class ProgramSubject {
+  /// Knowledge block this course belongs to, e.g. "Kiến thức cơ sở ngành".
+  final String knowledgeBlock;
+  final String subjectCode;
+  final String subjectName;
+  final int credits;
+
+  /// Which term the program schedules this course in. The portal is
+  /// inconsistent here (sometimes "1", sometimes "Học kỳ 1", sometimes
+  /// absent), so it stays a display string rather than an int.
+  final String semesterLabel;
+
+  /// False when the program marks the course as elective (tự chọn).
+  final bool isRequired;
+
+  const ProgramSubject({
+    required this.knowledgeBlock,
+    required this.subjectCode,
+    required this.subjectName,
+    required this.credits,
+    required this.semesterLabel,
+    required this.isRequired,
+  });
+
+  /// Requirement category the portal appends to the block label, e.g.
+  /// "Kiến thức ngành (Bắt buộc)" -> "Bắt buộc". Empty when absent.
+  String get category => _blockCategory(knowledgeBlock);
+
+  /// The block name with its "(Bắt buộc)" / "(Tự chọn)" suffix stripped, so
+  /// the category can be rendered as its own badge instead of inline text.
+  String get blockTitle {
+    final stripped = knowledgeBlock.replaceAll(RegExp(r'\s*\([^)]*\)\s*$'), '');
+    return stripped.isEmpty ? knowledgeBlock : stripped;
+  }
+
+  static String _blockCategory(String block) {
+    final match = RegExp(r'\(([^)]*)\)\s*$').firstMatch(block);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  factory ProgramSubject.fromJson(Map<String, dynamic> json) {
+    return ProgramSubject(
+      knowledgeBlock: json['knowledgeBlock'] as String? ?? '',
+      subjectCode: json['subjectCode'] as String? ?? '',
+      subjectName: json['subjectName'] as String? ?? '',
+      credits: (json['credits'] as num?)?.toInt() ?? 0,
+      semesterLabel: json['semesterLabel'] as String? ?? '',
+      isRequired: json['isRequired'] == true || json['isRequired'] == 1,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'knowledgeBlock': knowledgeBlock,
+        'subjectCode': subjectCode,
+        'subjectName': subjectName,
+        'credits': credits,
+        'semesterLabel': semesterLabel,
+        'isRequired': isRequired,
+      };
+
+  /// Walks the `programsubject/tree` response and returns every leaf course.
+  ///
+  /// Accepts either the raw list or a `{content: [...]}` envelope, and treats
+  /// any node with children as a knowledge block whose name is inherited by
+  /// everything beneath it.
+  static List<ProgramSubject> fromTree(dynamic tree) {
+    final results = <ProgramSubject>[];
+    final seen = <String>{};
+
+    void walk(dynamic node, String block) {
+      if (node is List) {
+        for (final child in node) {
+          walk(child, block);
+        }
+        return;
+      }
+      if (node is! Map) return;
+
+      final map = Map<String, dynamic>.from(node);
+
+      final children = _dig(map, ['children', 'nodes', 'subNodes', 'items']);
+      final name = _digString(map, [
+        'subject.subjectName',
+        'subjectName',
+        'name',
+        'displayName',
+      ]);
+
+      if (children is List && children.isNotEmpty) {
+        // Inner node: its own name becomes the block for everything below.
+        walk(children, name.isNotEmpty ? name : block);
+        return;
+      }
+
+      final code = _digString(map, [
+        'subject.subjectCode',
+        'subjectCode',
+        'code',
+      ]);
+
+      // Leaves without a course code are empty groups, not courses.
+      if (code.isEmpty && name.isEmpty) return;
+      if (code.isEmpty && _dig(map, ['subject']) == null) return;
+
+      // The same course can appear under multiple blocks; keep the first.
+      final key = '$block|$code|$name';
+      if (!seen.add(key)) return;
+
+      final compulsory = _dig(map, [
+        'isRequired',
+        'required',
+        'compulsory',
+        'isCompulsory',
+      ]);
+
+      // The portal encodes the requirement in the block label itself
+      // ("Kiến thức tự chọn (Tự chọn)"), which is more reliable than any
+      // per-node flag - the flag is often absent entirely.
+      final category = _blockCategory(block).toLowerCase();
+      final blockSaysElective = category.contains('tự chọn');
+
+      results.add(ProgramSubject(
+        knowledgeBlock: block,
+        subjectCode: code,
+        subjectName: name,
+        credits: _digInt(map, [
+              'subject.numberOfCredit',
+              'numberOfCredit',
+              'credits',
+              'credit',
+            ]) ??
+            0,
+        semesterLabel: _digString(map, [
+          'semester',
+          'semesterName',
+          'termNumber',
+          'hocKy',
+          'studySemester',
+        ]),
+        isRequired: compulsory != null
+            ? (compulsory == true || compulsory == 1)
+            : !blockSaysElective,
+      ));
+    }
+
+    final root = tree is Map && tree['content'] != null ? tree['content'] : tree;
+    walk(root, '');
+    return results;
+  }
+}
+
+/// Total credits across [subjects].
+int totalProgramCredits(List<ProgramSubject> subjects) =>
+    subjects.fold(0, (sum, s) => sum + s.credits);
+

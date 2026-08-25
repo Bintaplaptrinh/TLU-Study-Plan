@@ -664,4 +664,137 @@ class AuthService {
 
     return [];
   }
+
+  /// Fetch the student record tied to the logged-in account.
+  ///
+  /// Endpoint: GET /api/student/getstudentbylogin
+  ///
+  /// Richer than `getCurrentUser` - notably it carries the education program
+  /// id needed by [getProgramSubjectTree]. Returned raw because the shape
+  /// varies by student type and only a few fields are used.
+  Future<Map<String, dynamic>> getStudentByLogin(String accessToken) async {
+    try {
+      final httpClient = HttpClient()
+        ..badCertificateCallback =
+            (X509Certificate cert, String host, int port) => true;
+
+      final request = await httpClient.getUrl(
+        Uri.parse('$baseUrl/api/student/getstudentbylogin'),
+      );
+      request.headers.add('Authorization', 'Bearer $accessToken');
+      request.headers.add('Accept', 'application/json');
+
+      final response = await request.close().timeout(apiTimeout);
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(responseBody);
+        if (decoded is Map<String, dynamic>) return decoded;
+        throw Exception('Dữ liệu sinh viên không hợp lệ');
+      } else {
+        throw Exception(
+          'Không thể lấy thông tin sinh viên (${response.statusCode})',
+        );
+      }
+    } catch (e) {
+      if (e.toString().contains('CERTIFICATE_VERIFY_FAILED')) {
+        throw Exception('Lỗi chứng chỉ SSL. Vui lòng thử lại.');
+      }
+      throw Exception('Lỗi lấy thông tin sinh viên: $e');
+    }
+  }
+
+  /// Fetch the education program tree for [programId].
+  ///
+  /// Endpoint: GET /api/programsubject/tree/{programId}/1/1000
+  ///
+  /// Inner nodes are knowledge blocks, leaves are courses - see
+  /// [ProgramSubject.fromTree].
+  Future<dynamic> getProgramSubjectTree(
+    String accessToken,
+    int programId,
+  ) async {
+    try {
+      final httpClient = HttpClient()
+        ..badCertificateCallback =
+            (X509Certificate cert, String host, int port) => true;
+
+      final request = await httpClient.getUrl(
+        Uri.parse('$baseUrl/api/programsubject/tree/$programId/1/1000'),
+      );
+      request.headers.add('Authorization', 'Bearer $accessToken');
+      request.headers.add('Accept', 'application/json');
+
+      final response = await request.close().timeout(apiTimeout);
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 200) {
+        return jsonDecode(responseBody);
+      } else {
+        throw Exception(
+          'Không thể lấy chương trình đào tạo (${response.statusCode})',
+        );
+      }
+    } catch (e) {
+      if (e.toString().contains('CERTIFICATE_VERIFY_FAILED')) {
+        throw Exception('Lỗi chứng chỉ SSL. Vui lòng thử lại.');
+      }
+      throw Exception('Lỗi lấy chương trình đào tạo: $e');
+    }
+  }
+
+  /// Resolve the student's program id, then fetch and flatten its course tree.
+  ///
+  /// Two round-trips because the program id only comes back from the student
+  /// record; the id is stable, so callers should cache the result rather than
+  /// repeat this on every screen open.
+  Future<List<ProgramSubject>> getEducationProgram(String accessToken) async {
+    final student = await getStudentByLogin(accessToken);
+
+    final programId = _findProgramId(student);
+    if (programId == null) {
+      throw Exception('Không tìm thấy mã chương trình đào tạo của sinh viên');
+    }
+
+    final tree = await getProgramSubjectTree(accessToken, programId);
+    return ProgramSubject.fromTree(tree);
+  }
+
+  /// Digs the education program id out of a student record.
+  ///
+  /// The portal nests it differently depending on the account, so each known
+  /// location is tried in turn.
+  int? _findProgramId(Map<String, dynamic> student) {
+    const paths = [
+      ['program', 'id'],
+      ['educationProgram', 'id'],
+      ['programId'],
+      ['course', 'program', 'id'],
+      ['studentProgram', 'program', 'id'],
+      ['trainingProgram', 'id'],
+    ];
+
+    for (final path in paths) {
+      dynamic current = student;
+      var ok = true;
+
+      for (final key in path) {
+        if (current is Map && current[key] != null) {
+          current = current[key];
+        } else {
+          ok = false;
+          break;
+        }
+      }
+
+      if (!ok || current == null) continue;
+      if (current is int) return current;
+      if (current is num) return current.toInt();
+      final parsed = int.tryParse(current.toString());
+      if (parsed != null) return parsed;
+    }
+
+    return null;
+  }
 }
+
