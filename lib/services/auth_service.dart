@@ -1,8 +1,181 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:tlustudy_planner/models/api_response.dart';
+import 'package:tlustudy_planner/services/log_service.dart';
 
 class AuthService {
+  static final LogService _log = LogService();
+
+  /// Labels whose full probe detail has already been logged once.
+  ///
+  /// Marks are fetched per semester, so without this the log would repeat the
+  /// same six candidate paths nine times over and bury everything else.
+  static final Set<String> _probeLogged = <String>{};
+
+  /// Forget what has been logged, so the next probe reports in full again.
+  static void resetProbeLogging() => _probeLogged.clear();
+
+  /// Tries [endpoints] in order and returns the first 200 response's decoded
+  /// body, logging what happened at each step.
+  ///
+  /// The portal does not document these paths, so the app probes a list of
+  /// candidates. Previously every failure was swallowed by a bare `continue`,
+  /// which meant a wrong path, an auth error and a parse error all looked
+  /// identical: an empty screen. Now each attempt is recorded, so a mismatch
+  /// can be diagnosed from Cài đặt -> Nhật ký.
+  Future<dynamic> _probeEndpoints(
+    String accessToken,
+    String label,
+    List<String> endpoints,
+  ) async {
+    final verbose = _probeLogged.add(label);
+
+    for (final endpoint in endpoints) {
+      try {
+        final httpClient = HttpClient()
+          ..badCertificateCallback =
+              (X509Certificate cert, String host, int port) => true;
+
+        final request = await httpClient.getUrl(Uri.parse('$baseUrl$endpoint'));
+        request.headers.add('Authorization', 'Bearer $accessToken');
+        request.headers.add('Accept', 'application/json');
+
+        final response = await request.close().timeout(apiTimeout);
+        final body = await response.transform(utf8.decoder).join();
+
+        if (response.statusCode == 200) {
+          dynamic decoded;
+          try {
+            decoded = jsonDecode(body);
+          } catch (_) {
+            if (verbose) {
+              _log.log(
+                '$label: $endpoint trả 200 nhưng không phải JSON',
+                level: LogLevel.warning,
+              );
+            }
+            continue;
+          }
+
+          _log.log(
+            '$label: OK $endpoint (${body.length} bytes)',
+            level: LogLevel.success,
+          );
+          if (verbose) _logShape(label, decoded);
+          return decoded;
+        }
+
+        if (verbose) {
+          _log.log(
+            '$label: $endpoint -> ${response.statusCode}',
+            level: response.statusCode == 404
+                ? LogLevel.info
+                : LogLevel.warning,
+          );
+        }
+
+        // 401/403 mean the token is the problem, not the path - stop probing.
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          throw Exception(
+            'Phiên đăng nhập đã hết hạn (${response.statusCode})',
+          );
+        }
+      } on Exception catch (e) {
+        if (e.toString().contains('hết hạn')) rethrow;
+        if (verbose) {
+          _log.log('$label: $endpoint lỗi: $e', level: LogLevel.warning);
+        }
+      }
+    }
+
+    _log.log('$label: KHÔNG endpoint nào trả dữ liệu', level: LogLevel.error);
+    return null;
+  }
+
+  /// Records the *shape* of a successful response: the envelope key and the
+  /// field names of the first row.
+  ///
+  /// Only names are written, never values - the log is meant to be shareable
+  /// for debugging without leaking grades, fees or personal details.
+  void _logShape(String label, dynamic decoded) {
+    try {
+      String envelope;
+      List<dynamic> rows;
+
+      if (decoded is List) {
+        envelope = 'mảng gốc';
+        rows = decoded;
+      } else if (decoded is Map) {
+        // A plain loop rather than firstWhere: the map's value type is
+        // dynamic here, and an orElse sentinel trips Dart's runtime check on
+        // the closure's return type - which would throw inside the very
+        // diagnostic meant to explain a failure.
+        String? listKey;
+        for (final entry in decoded.entries) {
+          if (entry.value is List) {
+            listKey = entry.key.toString();
+            break;
+          }
+        }
+        envelope = listKey == null
+            ? 'object: ${decoded.keys.take(12).join(", ")}'
+            : 'object.$listKey';
+        rows = listKey == null ? const [] : decoded[listKey] as List;
+      } else {
+        _log.log(
+          '$label: kiểu dữ liệu lạ ${decoded.runtimeType}',
+          level: LogLevel.warning,
+        );
+        return;
+      }
+
+      _log.log(
+        '$label: envelope=$envelope, ${rows.length} bản ghi',
+        level: LogLevel.info,
+      );
+
+      final first = rows.isEmpty ? null : rows.first;
+      if (first is Map) {
+        _log.log(
+          '$label: trường = ${first.keys.join(", ")}',
+          level: LogLevel.info,
+        );
+        // One level of nesting matters for these endpoints (semester.id,
+        // subject.subjectCode), so nested object keys are listed too.
+        for (final entry in first.entries) {
+          if (entry.value is Map) {
+            final nested = (entry.value as Map).keys.take(15).join(", ");
+            _log.log(
+              '$label:   ${entry.key}.{ $nested }',
+              level: LogLevel.info,
+            );
+          }
+        }
+      } else if (rows.isNotEmpty) {
+        _log.log(
+          '$label: bản ghi đầu không phải object '
+          '(${first.runtimeType})',
+          level: LogLevel.warning,
+        );
+      }
+    } catch (e) {
+      _log.log('$label: không đọc được cấu trúc: $e', level: LogLevel.warning);
+    }
+  }
+
+  /// Pulls the row list out of whichever envelope the portal used.
+  List<dynamic> _rowsOf(dynamic decoded, {List<String> extraKeys = const []}) {
+    if (decoded is List) return decoded;
+    if (decoded is Map) {
+      for (final key in ['content', ...extraKeys, 'data', 'items', 'rows']) {
+        final value = decoded[key];
+        if (value is List) return value;
+      }
+    }
+    return const [];
+  }
+
   static const String baseUrl = 'https://sinhvien1.tlu.edu.vn/education';
   static const String tokenEndpoint = '/oauth/token';
   static const String userEndpoint = '/api/users/getCurrentUser';
@@ -11,11 +184,62 @@ class AuthService {
   static const String clientId = 'education_client';
   static const String clientSecret = 'password';
   static const String grantType = 'password';
-  
+
   // Timeout optimized for faster parallel execution
   static const Duration apiTimeout = Duration(seconds: 10);
 
   /// Authenticate user with student code and password
+  /// Exchanges a refresh token for a fresh access token.
+  ///
+  /// The portal's OAuth server issues a refresh token alongside every login,
+  /// and the app already stored it - it just never spent it. Without this the
+  /// access token simply died after `expires_in`, which is why the cached
+  /// screens kept working while anything live (điểm, rèn luyện, học phí,
+  /// CTĐT) started failing.
+  Future<LoginResponse> refreshAccessToken(String refreshToken) async {
+    try {
+      final httpClient = HttpClient()
+        ..badCertificateCallback =
+            (X509Certificate cert, String host, int port) => true;
+
+      final request = await httpClient.postUrl(
+        Uri.parse('$baseUrl$tokenEndpoint'),
+      );
+      request.headers.contentType = ContentType(
+        'application',
+        'x-www-form-urlencoded',
+      );
+      request.headers.add('Accept', 'application/json');
+      request.write(
+        'client_id=$clientId&client_secret=$clientSecret'
+        '&grant_type=refresh_token'
+        '&refresh_token=${Uri.encodeQueryComponent(refreshToken)}',
+      );
+
+      final response = await request.close().timeout(apiTimeout);
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 200) {
+        _log.log('Đã làm mới access token', level: LogLevel.success);
+        return LoginResponse.fromJson(jsonDecode(body));
+      }
+
+      _log.log(
+        'Làm mới token thất bại (${response.statusCode})',
+        level: LogLevel.warning,
+      );
+      throw Exception(
+        'Không làm mới được phiên đăng nhập '
+        '(${response.statusCode})',
+      );
+    } catch (e) {
+      if (e.toString().contains('CERTIFICATE_VERIFY_FAILED')) {
+        throw Exception('Lỗi chứng chỉ SSL. Vui lòng thử lại.');
+      }
+      rethrow;
+    }
+  }
+
   Future<LoginResponse> login(String studentCode, String password) async {
     try {
       // Use dart:io HttpClient with SSL verification disabled
@@ -450,219 +674,51 @@ class AuthService {
   /// Tries multiple endpoints to find the correct one
   /// Returns: List of StudentSubjectMark objects (điểm sinh viên)
   /// Note: This is real-time data, should NOT be cached
+  /// Course results for one semester.
+  ///
+  /// Endpoint confirmed against a live account; the alternatives that used to
+  /// be probed all answer 404, so they are gone.
   Future<List<StudentSubjectMark>> getStudentMarks(
     String accessToken,
     int semesterId,
   ) async {
-    // List of possible endpoints to try
-    final endpoints = [
-      '/api/studentsubjectmark/studentLoginUser/$semesterId',
-      '/api/studentsubjectmark/student/$semesterId',
-      '/api/student-subject-mark/studentLoginUser/$semesterId',
-      '/api/mark/studentLoginUser/$semesterId',
-      '/api/studentsubjectmark/1/1000', // Paginated version
-    ];
+    final decoded = await _probeEndpoints(accessToken, 'Điểm học phần', [
+      '/api/studentsubjectmark/getListStudentMarkBySemesterByLoginUser/$semesterId',
+    ]);
 
-    Exception? lastException;
-
-    // Try each endpoint
-    for (final endpoint in endpoints) {
-      try {
-        final httpClient = HttpClient()
-          ..badCertificateCallback =
-              (X509Certificate cert, String host, int port) => true;
-
-        final request = await httpClient.getUrl(
-          Uri.parse('$baseUrl$endpoint'),
-        );
-        request.headers.add('Authorization', 'Bearer $accessToken');
-        request.headers.add('Accept', 'application/json');
-
-        final response = await request.close().timeout(apiTimeout);
-        final responseBody = await response.transform(utf8.decoder).join();
-
-        if (response.statusCode == 200) {
-          final jsonResponse = jsonDecode(responseBody);
-
-          // Handle both array and paginated responses
-          List<dynamic> rawMarks = [];
-          if (jsonResponse is List) {
-            rawMarks = jsonResponse;
-          } else if (jsonResponse is Map && jsonResponse.containsKey('content')) {
-            rawMarks = jsonResponse['content'] ?? [];
-          }
-
-          // Filter by semester if we got all marks
-          if (endpoint.contains('/1/1000')) {
-            rawMarks = rawMarks.where((item) {
-              return item['semesterId'] == semesterId;
-            }).toList();
-          }
-
-          return rawMarks
-              .map((item) => StudentSubjectMark.fromJson(item))
-              .toList();
-        } else if (response.statusCode != 404) {
-          // If not 404, throw exception (don't try other endpoints)
-          throw Exception(
-            'Không thể lấy dữ liệu điểm số (${response.statusCode})',
-          );
-        }
-      } catch (e) {
-        lastException = e is Exception ? e : Exception(e.toString());
-        // Continue to next endpoint if this one fails
-        continue;
-      }
-    }
-
-    // If all endpoints failed, throw the last exception
-    if (lastException != null) {
-      if (lastException.toString().contains('CERTIFICATE_VERIFY_FAILED')) {
-        throw Exception('Lỗi chứng chỉ SSL. Vui lòng thử lại.');
-      }
-      throw Exception('Lỗi lấy dữ liệu điểm số: $lastException');
-    }
-
-    // No data found
-    return [];
+    return _rowsOf(decoded)
+        .whereType<Map>()
+        .map(
+          (row) => StudentSubjectMark.fromJson(Map<String, dynamic>.from(row)),
+        )
+        .toList();
   }
 
-  /// Fetch student behavior marks (điểm rèn luyện)
-  /// Tries multiple possible endpoints
-  /// Returns: List of StudentBehaviorMark objects
-  /// Note: This is real-time data, should NOT be cached
-  Future<List<StudentBehaviorMark>> getBehaviorMarks(
-    String accessToken,
-  ) async {
-    // List of possible endpoints to try
-    final endpoints = [
+  /// Conduct scores across every semester.
+  ///
+  /// The response is a single object whose semesters sit two levels down, so
+  /// the flattening lives in [StudentBehaviorMark.listFromResponse].
+  Future<List<StudentBehaviorMark>> getBehaviorMarks(String accessToken) async {
+    final decoded = await _probeEndpoints(accessToken, 'Điểm rèn luyện', [
       '/api/student_semester_behavior_mark/viewStudentBehaviorMarkByLoginUser',
-      '/api/studentsemesterbehaviormark/viewStudentBehaviorMarkByLoginUser',
-      '/api/student-semester-behavior-mark/viewStudentBehaviorMarkByLoginUser',
-      '/api/studentbehaviormark/studentLoginUser',
-      '/api/student/behavior-mark',
-    ];
+    ]);
 
-    // Try each endpoint
-    for (final endpoint in endpoints) {
-      try {
-        final httpClient = HttpClient()
-          ..badCertificateCallback =
-              (X509Certificate cert, String host, int port) => true;
-
-        final request = await httpClient.getUrl(
-          Uri.parse('$baseUrl$endpoint'),
-        );
-        request.headers.add('Authorization', 'Bearer $accessToken');
-        request.headers.add('Accept', 'application/json');
-
-        final response = await request.close().timeout(apiTimeout);
-        final responseBody = await response.transform(utf8.decoder).join();
-
-        if (response.statusCode == 200) {
-          final jsonResponse = jsonDecode(responseBody);
-
-          // Handle both array and paginated responses
-          List<dynamic> rawMarks = [];
-          if (jsonResponse is List) {
-            rawMarks = jsonResponse;
-          } else if (jsonResponse is Map && jsonResponse.containsKey('content')) {
-            rawMarks = jsonResponse['content'] ?? [];
-          } else if (jsonResponse is Map && jsonResponse.containsKey('schoolYearBehaviorMarks')) {
-            // TLU specific format
-            rawMarks = jsonResponse['schoolYearBehaviorMarks'] ?? [];
-          }
-
-          return rawMarks
-              .map((item) => StudentBehaviorMark.fromJson(item))
-              .toList();
-        } else if (response.statusCode == 404) {
-          // Not found, try next endpoint
-          continue;
-        } else if (response.statusCode >= 500) {
-          // Server error, try next endpoint instead of throwing
-          continue;
-        } else {
-          // Other error (401, 403, etc.), stop trying
-          throw Exception(
-            'Không thể lấy dữ liệu điểm rèn luyện (${response.statusCode})',
-          );
-        }
-      } catch (e) {
-        // If it's a parsing error, continue to next endpoint
-        continue;
-      }
-    }
-
-    // All endpoints failed, return empty instead of throwing
-    return [];
+    return StudentBehaviorMark.listFromResponse(decoded);
   }
 
-  /// Fetch student tuition payment information (học phí)
-  /// Tries multiple possible endpoints
-  /// Returns: List of StudentTuition objects
-  /// Note: This is real-time data, should NOT be cached
-  Future<List<StudentTuition>> getStudentPayable(
-    String accessToken,
-  ) async {
-    // List of possible endpoints to try
-    final endpoints = [
+  /// Tuition: totals, what is owed per semester, and the receipts.
+  ///
+  /// Returns a summary object rather than a list - the old model mapped over a
+  /// list that was never there, which is why the screen showed nothing.
+  Future<StudentTuition> getStudentPayable(String accessToken) async {
+    final decoded = await _probeEndpoints(accessToken, 'Học phí', [
       '/api/student/viewstudentpayablebyLoginUser',
-      '/api/student/viewStudentPayableByLoginUser',
-      '/api/studentpayable/viewbyloginuser',
-      '/api/student/payable',
-      '/api/tuition/student',
-    ];
+    ]);
 
-    Exception? lastException;
-
-    // Try each endpoint
-    for (final endpoint in endpoints) {
-      try {
-        final httpClient = HttpClient()
-          ..badCertificateCallback =
-              (X509Certificate cert, String host, int port) => true;
-
-        final request = await httpClient.getUrl(
-          Uri.parse('$baseUrl$endpoint'),
-        );
-        request.headers.add('Authorization', 'Bearer $accessToken');
-        request.headers.add('Accept', 'application/json');
-
-        final response = await request.close().timeout(apiTimeout);
-        final responseBody = await response.transform(utf8.decoder).join();
-
-        if (response.statusCode == 200) {
-          final jsonResponse = jsonDecode(responseBody);
-
-          // Handle both array and paginated responses
-          List<dynamic> rawPayments = [];
-          if (jsonResponse is List) {
-            rawPayments = jsonResponse;
-          } else if (jsonResponse is Map && jsonResponse.containsKey('content')) {
-            rawPayments = jsonResponse['content'] ?? [];
-          }
-
-          return rawPayments.map((item) => StudentTuition.fromJson(item)).toList();
-        } else if (response.statusCode != 404) {
-          throw Exception(
-            'Không thể lấy dữ liệu học phí (${response.statusCode})',
-          );
-        }
-      } catch (e) {
-        lastException = e is Exception ? e : Exception(e.toString());
-        continue;
-      }
+    if (decoded is Map) {
+      return StudentTuition.fromJson(Map<String, dynamic>.from(decoded));
     }
-
-    if (lastException != null) {
-      if (lastException.toString().contains('CERTIFICATE_VERIFY_FAILED')) {
-        throw Exception('Lỗi chứng chỉ SSL. Vui lòng thử lại.');
-      }
-      throw Exception('Lỗi lấy dữ liệu học phí: $lastException');
-    }
-
-    return [];
+    return StudentTuition.empty;
   }
 
   /// Fetch the student record tied to the logged-in account.
@@ -753,11 +809,35 @@ class AuthService {
 
     final programId = _findProgramId(student);
     if (programId == null) {
+      _log.log(
+        'Không tìm thấy programId. Các trường có trong hồ sơ sinh viên: '
+        '${student.keys.join(", ")}',
+        level: LogLevel.error,
+      );
       throw Exception('Không tìm thấy mã chương trình đào tạo của sinh viên');
     }
 
     final tree = await getProgramSubjectTree(accessToken, programId);
-    return ProgramSubject.fromTree(tree);
+    _logShape('Chương trình đào tạo', tree);
+
+    final subjects = ProgramSubject.fromTree(tree);
+
+    final blocks = subjects.map((s) => s.knowledgeBlock).toSet();
+    _log.log(
+      'Chương trình đào tạo: programId=$programId, '
+      '${subjects.length} học phần, ${blocks.length} khối kiến thức',
+      level: subjects.isEmpty ? LogLevel.warning : LogLevel.info,
+    );
+    if (subjects.isNotEmpty && blocks.length <= 1) {
+      // One block for the whole program means the response shape was not
+      // recognised - worth flagging rather than silently showing "Khác".
+      _log.log(
+        'Chương trình đào tạo chỉ có 1 khối kiến thức - '
+        'nhiều khả năng cấu trúc dữ liệu chưa được nhận diện đúng',
+        level: LogLevel.warning,
+      );
+    }
+    return subjects;
   }
 
   /// Digs the education program id out of a student record.
@@ -766,12 +846,23 @@ class AuthService {
   /// location is tried in turn.
   int? _findProgramId(Map<String, dynamic> student) {
     const paths = [
+      // Confirmed on a live account: this is where TLU keeps it.
+      ['enrollmentClass', 'program', 'id'],
+      ['programs', '0', 'program', 'id'],
       ['program', 'id'],
       ['educationProgram', 'id'],
       ['programId'],
       ['course', 'program', 'id'],
       ['studentProgram', 'program', 'id'],
       ['trainingProgram', 'id'],
+      // Seen on TLU accounts where the program hangs off the class or major
+      // rather than the student record itself.
+      ['studentClass', 'program', 'id'],
+      ['major', 'program', 'id'],
+      ['specialization', 'program', 'id'],
+      ['enrollmentProgram', 'id'],
+      ['programBySemester', 'id'],
+      ['student', 'program', 'id'],
     ];
 
     for (final path in paths) {
@@ -779,6 +870,15 @@ class AuthService {
       var ok = true;
 
       for (final key in path) {
+        final index = int.tryParse(key);
+        if (index != null && current is List) {
+          if (index >= current.length) {
+            ok = false;
+            break;
+          }
+          current = current[index];
+          continue;
+        }
         if (current is Map && current[key] != null) {
           current = current[key];
         } else {
@@ -797,4 +897,3 @@ class AuthService {
     return null;
   }
 }
-

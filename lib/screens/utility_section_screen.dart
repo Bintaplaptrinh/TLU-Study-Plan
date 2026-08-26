@@ -1,0 +1,1333 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tlustudy_planner/models/api_response.dart';
+import 'package:tlustudy_planner/providers/user_provider.dart';
+import 'package:tlustudy_planner/theme/app_theme.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
+
+/// Các mục con của "Tiện ích", mỗi mục là một trang riêng mở từ lưới thẻ.
+enum UtilitySection {
+  marks('Điểm số', Icons.grade_rounded),
+  behavior('Rèn luyện', Icons.emoji_events_rounded),
+  tuition('Học phí', Icons.payment_rounded),
+  program('Chương trình đào tạo', Icons.account_tree_rounded);
+
+  const UtilitySection(this.title, this.icon);
+
+  final String title;
+  final IconData icon;
+}
+
+/// Một mục của "Tiện ích" hiển thị toàn màn hình.
+///
+/// Trước đây bốn mục này là bốn tab chen nhau trên cùng một trang; giờ mỗi mục
+/// mở riêng từ lưới thẻ ở [UtilitiesScreen], nên có đủ chỗ thở và có nút back
+/// thay vì hàng tab cuộn ngang.
+class UtilitySectionScreen extends StatefulWidget {
+  const UtilitySectionScreen({super.key, required this.section});
+
+  final UtilitySection section;
+
+  @override
+  State<UtilitySectionScreen> createState() => _UtilitySectionScreenState();
+}
+
+class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
+  // Map of semester ID -> marks for that semester
+  Map<int, List<StudentSubjectMark>> _marksBySemester = {};
+  List<StudentBehaviorMark> _behaviorMarks = [];
+  StudentTuition _tuitionData = StudentTuition.empty;
+  bool _isLoadingMarks = false;
+  bool _isLoadingBehavior = false;
+  bool _isLoadingTuition = false;
+
+  // Knowledge blocks collapsed by default - the program runs to ~90 subjects.
+  final Set<String> _expandedBlocks = <String>{};
+  String? _marksError;
+  String? _behaviorError;
+  String? _tuitionError;
+
+  // Expanded state for each semester
+  Set<int> _expandedSemesters = {};
+
+  /// Chỉ số tab cũ, giữ lại để các hàm dựng bên dưới không phải viết lại.
+  int get _selectedTab => widget.section.index;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
+  }
+
+  /// Chỉ tải dữ liệu của mục đang mở.
+  ///
+  /// Bản cũ nạp cả bốn mục mỗi lần vào màn hình - trong đó điểm số phải gọi API
+  /// một lần cho *mỗi* học kỳ. Khi mỗi mục là một trang riêng thì ba phần còn
+  /// lại là công toi, nên mở trang nào tải trang đó.
+  Future<void> _loadData() async {
+    switch (widget.section) {
+      case UtilitySection.marks:
+        await _loadMarks();
+        break;
+      case UtilitySection.behavior:
+        await _loadBehavior();
+        break;
+      case UtilitySection.tuition:
+        await _loadTuition();
+        break;
+      case UtilitySection.program:
+        // Đọc từ SQLite khi đã có cache nên thường trả về tức thì.
+        context.read<UserProvider>().fetchEducationProgram();
+        break;
+    }
+  }
+
+  Future<void> _loadMarks() async {
+    final userProvider = context.read<UserProvider>();
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingMarks = true;
+      _marksError = null;
+    });
+
+    try {
+      final schoolYears = userProvider.schoolYears;
+      if (schoolYears == null || schoolYears.content.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _marksBySemester = {};
+            _isLoadingMarks = false;
+            _marksError = 'Không tìm thấy học kỳ';
+          });
+        }
+        return;
+      }
+
+      final allSemesters = schoolYears.content
+          .expand((year) => year.semesters)
+          .toList();
+
+      final Map<int, List<StudentSubjectMark>> marksBySemester = {};
+      for (final semester in allSemesters) {
+        try {
+          final marks = await userProvider.fetchStudentMarks(semester.id);
+          if (marks.isNotEmpty) {
+            marksBySemester[semester.id] = marks;
+          }
+        } catch (_) {
+          // Một kỳ lỗi không nên chặn các kỳ còn lại.
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _marksBySemester = marksBySemester;
+          _isLoadingMarks = false;
+          _marksError = marksBySemester.isEmpty ? 'no_data' : null;
+          if (marksBySemester.isNotEmpty) {
+            _expandedSemesters = {
+              marksBySemester.keys.reduce((a, b) => a > b ? a : b),
+            };
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _marksBySemester = {};
+          _isLoadingMarks = false;
+          _marksError = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _loadBehavior() async {
+    final userProvider = context.read<UserProvider>();
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingBehavior = true;
+      _behaviorError = null;
+    });
+    try {
+      final behaviorMarks = await userProvider.fetchBehaviorMarks();
+      if (mounted) {
+        setState(() {
+          _behaviorMarks = behaviorMarks;
+          _isLoadingBehavior = false;
+          _behaviorError = behaviorMarks.isEmpty ? 'no_data' : null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _behaviorMarks = [];
+          _isLoadingBehavior = false;
+          _behaviorError = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _loadTuition() async {
+    final userProvider = context.read<UserProvider>();
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingTuition = true;
+      _tuitionError = null;
+    });
+    try {
+      final tuitionData = await userProvider.fetchStudentPayable();
+      if (mounted) {
+        setState(() {
+          _tuitionData = tuitionData;
+          _isLoadingTuition = false;
+          _tuitionError = tuitionData.isEmpty ? 'no_data' : null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _tuitionData = StudentTuition.empty;
+          _isLoadingTuition = false;
+          _tuitionError = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final userProvider = context.watch<UserProvider>();
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 120,
+            pinned: true,
+            // Nút back mặc định đã đúng hành vi; chỉ tô trắng cho nổi trên nền
+            // gradient.
+            iconTheme: const IconThemeData(color: Colors.white),
+            flexibleSpace: FlexibleSpaceBar(
+              title: TrText(
+                widget.section.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: _loadData,
+                tooltip: 'Tải lại',
+              ),
+            ],
+          ),
+
+          // Dòng tóm tắt của riêng mục này.
+          SliverToBoxAdapter(
+            child: Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      widget.section.icon,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TrText(
+                          userProvider.tluUser?.displayName ?? 'Sinh viên',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TrText(
+                          _tabSubtitle(userProvider),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (widget.section == UtilitySection.marks) _buildMarksContent(theme),
+          if (widget.section == UtilitySection.behavior)
+            _buildBehaviorMarksContent(theme),
+          if (widget.section == UtilitySection.tuition)
+            _buildTuitionContent(theme),
+          if (widget.section == UtilitySection.program)
+            _buildEducationProgramContent(theme, userProvider),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMarksContent(ThemeData theme) {
+    if (_isLoadingMarks) {
+      return const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_marksBySemester.isEmpty) {
+      final isError = _marksError != null && _marksError != 'no_data';
+      return SliverFillRemaining(
+        child: _buildEmptyState(
+          isError ? 'Không thể tải điểm số' : 'Chưa có điểm số',
+          isError
+              ? 'API endpoint chưa được hỗ trợ hoặc chưa có dữ liệu.\nVui lòng thử lại sau.'
+              : 'Điểm số sẽ hiển thị sau khi giảng viên chấm điểm',
+          Icons.grade,
+        ),
+      );
+    }
+
+    // Calculate overall GPA across all semesters
+    double totalMark4 = 0;
+    double totalCredits = 0;
+    _marksBySemester.forEach((semesterId, marks) {
+      for (var mark in marks) {
+        if (mark.mark4 != null) {
+          totalMark4 += mark.mark4! * mark.credits;
+          totalCredits += mark.credits;
+        }
+      }
+    });
+    final overallGpa = totalCredits > 0 ? totalMark4 / totalCredits : 0.0;
+
+    // Get all semester IDs sorted in descending order (newest first)
+    final sortedSemesterIds = _marksBySemester.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        // Overall GPA Card
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const TrText(
+                    'GPA Tích lũy (Hệ 4)',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TrText(
+                    overallGpa.toStringAsFixed(2),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.menu_book, color: Colors.white, size: 28),
+                    const SizedBox(height: 4),
+                    TrText(
+                      '${totalCredits.toInt()} TC',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Semester sections
+        ...sortedSemesterIds.map((semesterId) {
+          final marks = _marksBySemester[semesterId]!;
+          final isExpanded = _expandedSemesters.contains(semesterId);
+
+          // Find semester name
+          final userProvider = context.read<UserProvider>();
+          String semesterName = 'Học kỳ $semesterId';
+          if (userProvider.schoolYears != null) {
+            for (final year in userProvider.schoolYears!.content) {
+              final semester = year.semesters.firstWhere(
+                (s) => s.id == semesterId,
+                orElse: () => year.semesters.first,
+              );
+              if (semester.id == semesterId) {
+                semesterName = semester.semesterName;
+                break;
+              }
+            }
+          }
+
+          // Calculate semester GPA
+          double semesterMark4 = 0;
+          double semesterCredits = 0;
+          for (var mark in marks) {
+            if (mark.mark4 != null) {
+              semesterMark4 += mark.mark4! * mark.credits;
+              semesterCredits += mark.credits;
+            }
+          }
+          final semesterGpa = semesterCredits > 0
+              ? semesterMark4 / semesterCredits
+              : 0.0;
+
+          return Column(
+            children: [
+              _buildSemesterHeader(
+                semesterName,
+                semesterGpa,
+                semesterCredits.toInt(),
+                marks.length,
+                isExpanded,
+                () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedSemesters.remove(semesterId);
+                    } else {
+                      _expandedSemesters.add(semesterId);
+                    }
+                  });
+                },
+                theme,
+              ),
+              if (isExpanded)
+                ...marks.map((mark) => _buildMarkCard(mark, theme)),
+            ],
+          );
+        }).toList(),
+      ]),
+    );
+  }
+
+  Widget _buildBehaviorMarksContent(ThemeData theme) {
+    if (_isLoadingBehavior) {
+      return const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_behaviorMarks.isEmpty) {
+      final isError = _behaviorError != null && _behaviorError != 'no_data';
+      return SliverFillRemaining(
+        child: _buildEmptyState(
+          isError ? 'Không thể tải điểm rèn luyện' : 'Chưa có điểm rèn luyện',
+          isError
+              ? 'API endpoint chưa được hỗ trợ hoặc chưa có dữ liệu.\nVui lòng thử lại sau.'
+              : 'Điểm rèn luyện sẽ được cập nhật sau mỗi học kỳ',
+          Icons.emoji_events,
+        ),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final mark = _behaviorMarks[index];
+        return _buildBehaviorCard(mark, theme);
+      }, childCount: _behaviorMarks.length),
+    );
+  }
+
+  Widget _buildTuitionContent(ThemeData theme) {
+    if (_isLoadingTuition) {
+      return const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final tuition = _tuitionData;
+    if (tuition.isEmpty) {
+      final isError = _tuitionError != null && _tuitionError != 'no_data';
+      return SliverFillRemaining(
+        child: _buildEmptyState(
+          isError
+              ? 'Không thể tải thông tin học phí'
+              : 'Chưa có thông tin học phí',
+          isError
+              ? 'Hãy thử Cập nhật dữ liệu trong Cài đặt.'
+              : 'Thông tin học phí sẽ được cập nhật',
+          Icons.payment,
+        ),
+      );
+    }
+
+    // Summary card, then the amounts owed, then the receipts.
+    final items = <Widget>[
+      _buildTuitionSummary(tuition, theme),
+      if (tuition.fees.isNotEmpty)
+        _buildSectionLabel('Các khoản phải nộp', theme),
+      ...tuition.fees.map((e) => _buildTuitionEntryCard(e, theme)),
+      if (tuition.payments.isNotEmpty) _buildSectionLabel('Đã nộp', theme),
+      ...tuition.payments.map((e) => _buildTuitionEntryCard(e, theme)),
+    ];
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => items[index],
+        childCount: items.length,
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      child: TrText(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
+  /// Totals across the whole degree, straight from the portal's own figures.
+  Widget _buildTuitionSummary(StudentTuition tuition, ThemeData theme) {
+    final settled = tuition.totalOutstanding <= 0;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TrText(
+                  'Tổng quan học phí',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: (settled ? Colors.green : Colors.orange).withValues(
+                    alpha: 0.12,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TrText(
+                  settled ? 'Đã hoàn thành' : 'Còn nợ',
+                  style: TextStyle(
+                    color: settled ? Colors.green : Colors.orange,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildTuitionRow(
+            'Tổng phải nộp',
+            tuition.totalReceivable,
+            theme,
+            icon: Icons.attach_money,
+          ),
+          const Divider(height: 24),
+          _buildTuitionRow(
+            'Đã nộp',
+            tuition.totalReceived,
+            theme,
+            color: Colors.green,
+            icon: Icons.check_circle,
+          ),
+          const SizedBox(height: 8),
+          _buildTuitionRow(
+            'Còn lại',
+            tuition.totalOutstanding,
+            theme,
+            color: settled ? Colors.green : Colors.red,
+            icon: Icons.pending,
+            isBold: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One fee line or one receipt.
+  Widget _buildTuitionEntryCard(TuitionEntry entry, ThemeData theme) {
+    final settled = !entry.isPayment && entry.outstanding <= 0;
+    final accent = entry.isPayment
+        ? Colors.green
+        : (settled ? Colors.green : Colors.orange);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              entry.isPayment ? Icons.receipt_long : Icons.school,
+              size: 20,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.semesterName.isEmpty
+                      ? context.tr('Không rõ học kỳ')
+                      : entry.semesterName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                  ),
+                ),
+                if ((entry.note ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    entry.note!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (!entry.isPayment && entry.outstanding > 0) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '${context.tr('Còn lại')}: '
+                    '${_formatCurrency(entry.outstanding)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            _formatCurrency(entry.amount),
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 14.5,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One-line summary under the student's name, matching the active tab.
+  String _tabSubtitle(UserProvider userProvider) {
+    switch (_selectedTab) {
+      case 0:
+        return '${_marksBySemester.length} học kỳ có điểm';
+      case 1:
+        return '${_behaviorMarks.length} bản ghi rèn luyện';
+      case 2:
+        return '${_tuitionData.fees.length + _tuitionData.payments.length} ${context.tr('bản ghi học phí')}';
+      case 3:
+        final count = userProvider.educationProgram.length;
+        if (count == 0) return 'Chương trình đào tạo';
+        return '$count học phần · ${userProvider.educationProgramCredits} tín chỉ';
+      default:
+        return '';
+    }
+  }
+
+  Widget _buildEducationProgramContent(
+    ThemeData theme,
+    UserProvider userProvider,
+  ) {
+    if (userProvider.isLoadingEducationProgram &&
+        userProvider.educationProgram.isEmpty) {
+      return const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final grouped = userProvider.educationProgramByBlock;
+
+    if (grouped.isEmpty) {
+      return SliverFillRemaining(
+        child: _buildEmptyState(
+          'Chưa có chương trình đào tạo',
+          'Chương trình đào tạo sẽ hiển thị sau khi đồng bộ dữ liệu',
+          Icons.account_tree,
+        ),
+      );
+    }
+
+    final blocks = grouped.keys.toList();
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        // Row 0 is the summary card; the rest are knowledge blocks.
+        if (index == 0) {
+          return _buildProgramSummary(userProvider, blocks.length, theme);
+        }
+
+        final block = blocks[index - 1];
+        final subjects = grouped[block]!;
+        return _buildKnowledgeBlock(block, subjects, theme);
+      }, childCount: blocks.length + 1),
+    );
+  }
+
+  Widget _buildProgramSummary(
+    UserProvider userProvider,
+    int blockCount,
+    ThemeData theme,
+  ) {
+    final subjects = userProvider.educationProgram;
+    final electives = subjects.where((s) => !s.isRequired).length;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          _buildProgramStat(
+            '${userProvider.educationProgramCredits}',
+            'Tín chỉ',
+            theme,
+          ),
+          _buildProgramStat('${subjects.length}', 'Học phần', theme),
+          _buildProgramStat('$blockCount', 'Khối KT', theme),
+          if (electives > 0) _buildProgramStat('$electives', 'Tự chọn', theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgramStat(String value, String label, ThemeData theme) {
+    return Expanded(
+      child: Column(
+        children: [
+          TrText(
+            value,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          TrText(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKnowledgeBlock(
+    String block,
+    List<ProgramSubject> subjects,
+    ThemeData theme,
+  ) {
+    final isExpanded = _expandedBlocks.contains(block);
+    final credits = totalProgramCredits(subjects);
+    final category = subjects.first.category;
+    final categoryColor = _categoryColor(category, theme);
+
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              if (isExpanded) {
+                _expandedBlocks.remove(block);
+              } else {
+                _expandedBlocks.add(block);
+              }
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.folder_outlined,
+                    color: AppTheme.primaryColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TrText(
+                        subjects.first.blockTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      TrText(
+                        '${subjects.length} học phần · $credits tín chỉ',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (category.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: categoryColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: TrText(
+                      category,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: categoryColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isExpanded)
+          ...subjects.map((subject) => _buildProgramSubjectRow(subject, theme)),
+      ],
+    );
+  }
+
+  /// Colour for the requirement badge: electives and certificates read as
+  /// "optional-ish", required blocks as the primary accent.
+  Color _categoryColor(String category, ThemeData theme) {
+    final lower = category.toLowerCase();
+    if (lower.contains('tự chọn')) return Colors.orange.shade700;
+    if (lower.contains('chứng chỉ')) return Colors.blueGrey;
+    return AppTheme.primaryColor;
+  }
+
+  Widget _buildProgramSubjectRow(ProgramSubject subject, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(28, 3, 16, 3),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TrText(
+                  subject.subjectName.isEmpty
+                      ? subject.subjectCode
+                      : subject.subjectName,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (subject.subjectCode.isNotEmpty) ...[
+                      TrText(
+                        subject.subjectCode,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    if (subject.semesterLabel.isNotEmpty)
+                      TrText(
+                        'HK ${subject.semesterLabel}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TrText(
+                  '${subject.credits} TC',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String title, String subtitle, IconData icon) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 64,
+                color: theme.colorScheme.onSurface.withOpacity(0.3),
+              ),
+            ),
+            const SizedBox(height: 24),
+            TrText(
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            TrText(
+              subtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const TrText('Thử lại'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSemesterHeader(
+    String semesterName,
+    double gpa,
+    int credits,
+    int subjectCount,
+    bool isExpanded,
+    VoidCallback onTap,
+    ThemeData theme,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.school, color: AppTheme.primaryColor, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TrText(
+                    semesterName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  TrText(
+                    '$subjectCount môn • $credits TC • GPA: ${gpa.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              isExpanded ? Icons.expand_less : Icons.expand_more,
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMarkCard(StudentSubjectMark mark, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        title: TrText(
+          mark.subjectName,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: TrText(
+                  mark.subjectCode,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.credit_card, size: 14, color: AppTheme.accentColor),
+              const SizedBox(width: 4),
+              TrText(
+                '${mark.credits.toStringAsFixed(1)} TC',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: mark.isPassed
+                ? Colors.green.withOpacity(0.1)
+                : Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (mark.mark10 != null)
+                TrText(
+                  mark.mark10!.toStringAsFixed(1),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: mark.isPassed ? Colors.green : Colors.red,
+                  ),
+                ),
+              if (mark.markLetter != null)
+                TrText(
+                  mark.markLetter!,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: mark.isPassed ? Colors.green : Colors.red,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBehaviorCard(StudentBehaviorMark mark, ThemeData theme) {
+    Color getMarkColor(int markValue) {
+      if (markValue >= 90) return Colors.green;
+      if (markValue >= 80) return Colors.blue;
+      if (markValue >= 65) return Colors.orange;
+      if (markValue >= 50) return Colors.deepOrange;
+      return Colors.red;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: getMarkColor(mark.mark).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.emoji_events,
+              color: getMarkColor(mark.mark),
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TrText(
+                  mark.semesterName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TrText(
+                  mark.classification,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: getMarkColor(mark.mark),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: getMarkColor(mark.mark).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TrText(
+              '${mark.mark}',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: getMarkColor(mark.mark),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTuitionRow(
+    String label,
+    double amount,
+    ThemeData theme, {
+    Color? color,
+    IconData? icon,
+    bool isBold = false,
+  }) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(
+            icon,
+            size: 16,
+            color: color ?? theme.colorScheme.onSurface.withOpacity(0.7),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Expanded(
+          child: TrText(
+            label,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+        TrText(
+          '${_formatCurrency(amount)} đ',
+          style: TextStyle(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            fontSize: isBold ? 16 : 14,
+            color: color ?? theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatCurrency(double amount) {
+    return amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
+  }
+}

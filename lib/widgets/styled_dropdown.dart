@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
 
 class StyledDropdownButton<T> extends StatelessWidget {
   final T? value;
@@ -42,7 +43,7 @@ class StyledDropdownButton<T> extends StatelessWidget {
             child: DropdownButton<T>(
               value: value,
               isExpanded: isExpanded,
-              hint: hint != null ? Text(hint!) : null,
+              hint: hint != null ? TrText(hint!) : null,
               icon: Icon(
                 Icons.arrow_drop_down_rounded,
                 color: colorScheme.primary,

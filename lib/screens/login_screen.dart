@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/providers/exam_provider.dart';
 import 'package:tlustudy_planner/services/log_service.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
+import 'package:tlustudy_planner/widgets/app_snackbar.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -83,12 +85,11 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Đăng nhập thành công!'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 2),
-        ),
+      showAppSnackBar(
+        context,
+        'Đăng nhập thành công!',
+        tone: SnackTone.success,
+        duration: const Duration(seconds: 2),
       );
 
       // Go back to settings screen
@@ -159,13 +160,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: colorScheme.surface,
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withOpacity(0.15),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
                       ),
                       child: Icon(
                         Icons.school_rounded,
@@ -174,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Text(
+                    TrText(
                       'TLU Study Planner',
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -182,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
+                    TrText(
                       'Quản lý lịch học',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: colorScheme.onPrimaryContainer.withOpacity(0.8),
@@ -203,14 +197,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 delegate: SliverChildListDelegate([
 
                   // Welcome text
-                  Text(
+                  TrText(
                     'Chào mừng',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  TrText(
                     'Đăng nhập để xem lịch học của bạn',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
@@ -239,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
+                            child: TrText(
                               _errorMessage!,
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: colorScheme.onErrorContainer,
@@ -357,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
+                                const TrText(
                                   'Đăng nhập',
                                   style: TextStyle(
                                     fontSize: 16,
@@ -411,7 +405,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
-                                    child: Text(
+                                    child: TrText(
                                       userProvider.loginProgress.isEmpty
                                           ? 'Đang xử lý...'
                                           : userProvider.loginProgress,
@@ -433,7 +427,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       color: colorScheme.primaryContainer,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Text(
+                                    child: TrText(
                                       '${(userProvider.loginProgressPercent * 100).toInt()}%',
                                       style: Theme.of(context)
                                           .textTheme
@@ -458,7 +452,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: Text(
+                                    child: TrText(
                                       'Đang tải dữ liệu. Vui lòng không thoát ứng dụng.',
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:tlustudy_planner/providers/exam_provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/widgets/cupertino_widgets.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
 
 /// Banner widget that shows pre-caching progress
 /// Displayed at the top of the screen when caching is in progress
@@ -75,7 +76,7 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            TrText(
                               examProvider.isPreCaching 
                                   ? 'Đang tải dữ liệu offline...'
                                   : 'Hoàn tất!',
@@ -86,7 +87,7 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(
+                            TrText(
                               examProvider.preCacheStatus,
                               style: const TextStyle(
                                 color: Colors.white70,
@@ -99,7 +100,7 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
+                      TrText(
                         '${examProvider.preCacheProgress}%',
                         style: const TextStyle(
                           color: Colors.white,
@@ -121,7 +122,7 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
                   ),
                   if (examProvider.preCacheTotalSemesters > 0) ...[
                     const SizedBox(height: 8),
-                    Text(
+                    TrText(
                       'Học kỳ: ${examProvider.preCacheCurrentSemester}/${examProvider.preCacheTotalSemesters}',
                       style: const TextStyle(
                         color: Colors.white70,
@@ -132,7 +133,7 @@ class _CacheProgressBannerState extends State<CacheProgressBanner> {
                   ],
                   if (!examProvider.isPreCaching && examProvider.preCacheProgress == 100) ...[
                     const SizedBox(height: 8),
-                    const Text(
+                    const TrText(
                       'Ứng dụng có thể hoạt động hoàn toàn offline',
                       style: TextStyle(
                         color: Colors.white,

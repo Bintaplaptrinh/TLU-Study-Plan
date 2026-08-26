@@ -7,6 +7,7 @@ import 'package:tlustudy_planner/models/api_response.dart';
 import 'package:tlustudy_planner/models/user.dart';
 import 'package:tlustudy_planner/providers/exam_provider.dart';
 import 'package:tlustudy_planner/services/auth_service.dart';
+import 'package:tlustudy_planner/services/credential_store.dart';
 import 'package:tlustudy_planner/services/daily_notification_service.dart';
 import 'package:tlustudy_planner/services/database_helper.dart';
 import 'package:tlustudy_planner/services/log_service.dart';
@@ -70,6 +71,13 @@ class UserProvider extends ChangeNotifier {
   /// The student's education program (chương trình đào tạo), flattened from
   /// the portal's knowledge-block tree.
   List<ProgramSubject> _educationProgram = <ProgramSubject>[];
+
+  /// Tiện ích data, hydrated from SQLite at start-up and refreshed on sync.
+  Map<int, List<StudentSubjectMark>> _marksBySemester =
+      <int, List<StudentSubjectMark>>{};
+  List<StudentBehaviorMark> _behaviorMarks = <StudentBehaviorMark>[];
+  StudentTuition _tuition = StudentTuition.empty;
+  bool _isSyncingUtilities = false;
   bool _isLoadingEducationProgram = false;
 
   // ---------------------------------------------------------------------------
@@ -100,10 +108,10 @@ class UserProvider extends ChangeNotifier {
   /// A lightweight, never-null view of the signed-in student, used by screens
   /// that only need a name / id / email.
   User get currentUser => User(
-        studentId: _tluUser?.username ?? _studentCode ?? '',
-        fullName: _tluUser?.displayName ?? _studentCode ?? '',
-        email: _tluUser?.email ?? '',
-      );
+    studentId: _tluUser?.username ?? _studentCode ?? '',
+    fullName: _tluUser?.displayName ?? _studentCode ?? '',
+    email: _tluUser?.email ?? '',
+  );
 
   SchoolYearResponse? get schoolYears => _schoolYears;
 
@@ -123,13 +131,48 @@ class UserProvider extends ChangeNotifier {
   /// Total credits the program requires, across every knowledge block.
   int get educationProgramCredits => totalProgramCredits(_educationProgram);
 
+  /// Cached marks, keyed by semester id.
+  Map<int, List<StudentSubjectMark>> get marksBySemester =>
+      Map.unmodifiable(_marksBySemester);
+
+  List<StudentSubjectMark> get allMarks =>
+      _marksBySemester.values.expand((m) => m).toList();
+
+  List<StudentBehaviorMark> get behaviorMarks =>
+      List.unmodifiable(_behaviorMarks);
+
+  StudentTuition get tuition => _tuition;
+
+  bool get isSyncingUtilities => _isSyncingUtilities;
+
+  /// Cumulative GPA on the 4-point scale, over courses the portal counts.
+  double? get gpa4 {
+    final counted = allMarks.where(
+      (m) => m.isCounted && m.mark4 != null && m.credits > 0,
+    );
+    if (counted.isEmpty) return null;
+    final credits = counted.fold<int>(0, (sum, m) => sum + m.credits);
+    if (credits == 0) return null;
+    final points = counted.fold<double>(
+      0,
+      (sum, m) => sum + (m.mark4! * m.credits),
+    );
+    return points / credits;
+  }
+
+  /// Credits actually earned.
+  int get earnedCredits => allMarks
+      .where((m) => m.isCounted && m.isPassed)
+      .fold<int>(0, (sum, m) => sum + m.credits);
+
   /// Program courses grouped by knowledge block, preserving the portal's
   /// ordering of both blocks and courses within them.
   Map<String, List<ProgramSubject>> get educationProgramByBlock {
     final grouped = <String, List<ProgramSubject>>{};
     for (final subject in _educationProgram) {
-      final block =
-          subject.knowledgeBlock.isEmpty ? 'Khác' : subject.knowledgeBlock;
+      final block = subject.knowledgeBlock.isEmpty
+          ? 'Khác'
+          : subject.knowledgeBlock;
       grouped.putIfAbsent(block, () => <ProgramSubject>[]).add(subject);
     }
     return grouped;
@@ -199,10 +242,20 @@ class UserProvider extends ChangeNotifier {
         _lastDataReload = DateTime.fromMillisecondsSinceEpoch(lastReloadMs);
       }
 
-      // Drop an obviously expired token so the UI shows the login screen.
+      // An expired token is recoverable: spend the refresh token (or the
+      // stored credentials) before falling back to the login screen.
       if (_accessToken != null && _isTokenExpired()) {
-        _log.log('Stored access token has expired', level: LogLevel.warning);
-        await _clearSession();
+        _log.log(
+          'Access token đã hết hạn, đang thử làm mới',
+          level: LogLevel.warning,
+        );
+        if (!await _renewSession()) {
+          _log.log(
+            'Không làm mới được phiên, cần đăng nhập lại',
+            level: LogLevel.warning,
+          );
+          await _clearSession();
+        }
       }
 
       await _loadFromCache();
@@ -219,6 +272,128 @@ class UserProvider extends ChangeNotifier {
     } catch (e, stack) {
       _log.log('UserProvider.init failed: $e', level: LogLevel.error);
       debugPrint('UserProvider.init failed: $e\n$stack');
+    }
+  }
+
+  /// True when the token is gone, expired, or about to expire.
+  ///
+  /// The 60s skew stops a request being sent with a token that dies
+  /// mid-flight, which used to surface as a bare 401 on the live screens.
+  bool _needsRenewal() {
+    if (_accessToken == null || _accessToken!.isEmpty) return true;
+    final expiry = _tokenExpiryMs;
+    if (expiry == null) return false;
+    return DateTime.now().millisecondsSinceEpoch >=
+        expiry - const Duration(seconds: 60).inMilliseconds;
+  }
+
+  /// Only one renewal runs at a time; the marks screen fires nine semester
+  /// requests at once and they must not each start their own login.
+  Future<bool>? _renewal;
+
+  Future<bool> _renewSession() {
+    return _renewal ??= _doRenewSession().whenComplete(() => _renewal = null);
+  }
+
+  Future<bool> _doRenewSession() async {
+    // Preferred: spend the refresh token the portal already gave us.
+    final refresh = _refreshToken;
+    if (refresh != null && refresh.isNotEmpty) {
+      try {
+        final response = await _authService.refreshAccessToken(refresh);
+        await _storeSession(response);
+        return true;
+      } catch (e) {
+        _log.log('Refresh token không dùng được: $e', level: LogLevel.warning);
+      }
+    }
+
+    // Fallback: replay the stored credentials.
+    final saved = await CredentialStore.instance.read();
+    if (saved == null) return false;
+
+    try {
+      final response = await _authService.login(
+        saved.studentCode,
+        saved.password,
+      );
+      await _storeSession(response);
+      _log.log(
+        'Đã đăng nhập lại bằng thông tin đã lưu',
+        level: LogLevel.success,
+      );
+      return true;
+    } catch (e) {
+      _log.log('Đăng nhập lại thất bại: $e', level: LogLevel.error);
+      return false;
+    }
+  }
+
+  Future<void> _storeSession(LoginResponse response) async {
+    _accessToken = response.accessToken;
+    if (response.refreshToken.isNotEmpty) {
+      _refreshToken = response.refreshToken;
+    }
+    _tokenExpiryMs = DateTime.now()
+        .add(Duration(seconds: response.expiresIn))
+        .millisecondsSinceEpoch;
+
+    await _prefs?.setString(_kAccessToken, _accessToken!);
+    if (_refreshToken != null) {
+      await _prefs?.setString(_kRefreshToken, _refreshToken!);
+    }
+    await _prefs?.setInt(_kTokenExpiry, _tokenExpiryMs!);
+    notifyListeners();
+  }
+
+  /// Returns a usable access token, renewing first when necessary.
+  ///
+  /// Every live fetch goes through this. Without it the app happily sent a
+  /// dead token and reported an empty screen.
+  Future<String?> ensureValidToken() async {
+    if (!_needsRenewal()) return _accessToken;
+    if (await _renewSession()) return _accessToken;
+    return null;
+  }
+
+  /// Runs [action] with a valid token, retrying once if the portal still
+  /// answers "session expired" - which happens when the server invalidated the
+  /// token earlier than its stated lifetime.
+  Future<T> _withValidToken<T>(
+    String label,
+    Future<T> Function(String token) action,
+    T fallback,
+  ) async {
+    final token = await ensureValidToken();
+    if (token == null) {
+      _log.log(
+        '$label: không có phiên đăng nhập hợp lệ',
+        level: LogLevel.warning,
+      );
+      return fallback;
+    }
+
+    try {
+      return await action(token);
+    } catch (e) {
+      if (!e.toString().contains('hết hạn')) {
+        _log.log('$label: $e', level: LogLevel.warning);
+        return fallback;
+      }
+
+      _log.log(
+        '$label: token bị từ chối, thử làm mới rồi gọi lại',
+        level: LogLevel.warning,
+      );
+      if (!await _renewSession()) return fallback;
+      final retryToken = _accessToken;
+      if (retryToken == null) return fallback;
+      try {
+        return await action(retryToken);
+      } catch (e2) {
+        _log.log('$label: vẫn lỗi sau khi làm mới: $e2', level: LogLevel.error);
+        return fallback;
+      }
     }
   }
 
@@ -248,6 +423,14 @@ class UserProvider extends ChangeNotifier {
       }
 
       _educationProgram = await _db.getEducationProgram();
+
+      final cachedMarks = await _db.getAllMarks();
+      _marksBySemester = <int, List<StudentSubjectMark>>{};
+      for (final mark in cachedMarks) {
+        _marksBySemester.putIfAbsent(mark.semesterId, () => []).add(mark);
+      }
+      _behaviorMarks = await _db.getBehaviorMarks();
+      _tuition = await _db.getTuition() ?? StudentTuition.empty;
 
       _log.log(
         'Loaded from cache: ${_courseHours.length} course hours, '
@@ -297,11 +480,15 @@ class UserProvider extends ChangeNotifier {
     final composed = <SchoolYear>[];
 
     for (final year in years) {
-      final owned = unassigned
-          .where((s) =>
-              s.startDate >= year.startDate && s.startDate <= year.endDate)
-          .toList()
-        ..sort((a, b) => a.startDate.compareTo(b.startDate));
+      final owned =
+          unassigned
+              .where(
+                (s) =>
+                    s.startDate >= year.startDate &&
+                    s.startDate <= year.endDate,
+              )
+              .toList()
+            ..sort((a, b) => a.startDate.compareTo(b.startDate));
       unassigned.removeWhere(owned.contains);
 
       composed.add(
@@ -377,7 +564,10 @@ class UserProvider extends ChangeNotifier {
     try {
       final valid = await _authService.isTokenValid(token);
       if (!valid) {
-        _log.log('Token rejected by server — signing out', level: LogLevel.warning);
+        _log.log(
+          'Token rejected by server — signing out',
+          level: LogLevel.warning,
+        );
         await logout();
         return;
       }
@@ -423,6 +613,9 @@ class UserProvider extends ChangeNotifier {
       await _prefs?.setString(_kRefreshToken, _refreshToken!);
       await _prefs?.setInt(_kTokenExpiry, _tokenExpiryMs!);
       await _prefs?.setString(_kStudentCode, studentCode);
+      // Kept in the keystore so the live screens can re-authenticate silently
+      // once the refresh token itself expires.
+      await CredentialStore.instance.save(studentCode, password);
 
       _log.log('Login successful for $studentCode', level: LogLevel.info);
 
@@ -482,13 +675,18 @@ class UserProvider extends ChangeNotifier {
       final info = await _authService.getSemesterInfo(token);
       currentSemesterId = info.id;
     } catch (e) {
-      _log.log('Could not resolve current semester: $e', level: LogLevel.warning);
+      _log.log(
+        'Could not resolve current semester: $e',
+        level: LogLevel.warning,
+      );
     }
 
-    final savedSemesterId =
-        isInitialLogin ? null : _prefs?.getInt(_kSelectedSemesterId);
-    _selectedSemester =
-        _pickSemester(preferredId: currentSemesterId ?? savedSemesterId);
+    final savedSemesterId = isInitialLogin
+        ? null
+        : _prefs?.getInt(_kSelectedSemesterId);
+    _selectedSemester = _pickSemester(
+      preferredId: currentSemesterId ?? savedSemesterId,
+    );
 
     if (_selectedSemester != null) {
       await _persistSemesters();
@@ -511,7 +709,12 @@ class UserProvider extends ChangeNotifier {
       _log.log('Could not load education program: $e', level: LogLevel.warning);
     }
 
-    // 7. Wrap up
+    // 7. Tiện ích data (điểm, rèn luyện, học phí). Cached like the timetable
+    // so the screens open instantly and still work offline.
+    _setProgress('Đang tải điểm và học phí...', 0.96);
+    await syncUtilitiesData();
+
+    // 8. Wrap up
     _setProgress('Hoàn tất', 1.0);
     _lastDataReload = DateTime.now();
     await _prefs?.setInt(
@@ -555,6 +758,9 @@ class UserProvider extends ChangeNotifier {
   Future<void> _clearSession() async {
     _accessToken = null;
     _refreshToken = null;
+    // The keystore copy has to go with the session, or "sign out" would not
+    // actually sign the student out.
+    unawaited(CredentialStore.instance.clear());
     _tokenExpiryMs = null;
 
     await _prefs?.remove(_kAccessToken);
@@ -575,6 +781,9 @@ class UserProvider extends ChangeNotifier {
     _courseHours = <int, CourseHour>{};
     _courses = <StudentCourseSubject>[];
     _educationProgram = <ProgramSubject>[];
+    _marksBySemester = <int, List<StudentSubjectMark>>{};
+    _behaviorMarks = <StudentBehaviorMark>[];
+    _tuition = StudentTuition.empty;
     _lastDataReload = null;
     _loginProgress = '';
     _loginProgressPercent = 0.0;
@@ -634,8 +843,10 @@ class UserProvider extends ChangeNotifier {
       _courses = await _db.getStudentCourses(semester.id);
       notifyListeners();
     } catch (e) {
-      _log.log('No cached courses for semester ${semester.id}: $e',
-          level: LogLevel.debug);
+      _log.log(
+        'No cached courses for semester ${semester.id}: $e',
+        level: LogLevel.debug,
+      );
     }
 
     await _fetchCoursesForSemester(semester, notify: false);
@@ -652,7 +863,7 @@ class UserProvider extends ChangeNotifier {
     Semester semester, {
     bool notify = true,
   }) async {
-    final token = _accessToken;
+    final token = await ensureValidToken();
     if (token == null) return;
 
     if (notify) {
@@ -661,8 +872,10 @@ class UserProvider extends ChangeNotifier {
     }
 
     try {
-      final courses =
-          await _authService.getStudentCourseSubject(token, semester.id);
+      final courses = await _authService.getStudentCourseSubject(
+        token,
+        semester.id,
+      );
 
       _courses = courses;
       await _db.saveStudentCourses(semester.id, courses);
@@ -697,8 +910,9 @@ class UserProvider extends ChangeNotifier {
       return const <StudentCourseSubject>[];
     }
 
-    final semesterStart =
-        DateTime.fromMillisecondsSinceEpoch(semester.startDate);
+    final semesterStart = DateTime.fromMillisecondsSinceEpoch(
+      semester.startDate,
+    );
 
     return _courses
         .where((course) => course.isActiveOn(date, semesterStart))
@@ -713,6 +927,9 @@ class UserProvider extends ChangeNotifier {
     }
 
     _log.log('Reloading all data', level: LogLevel.info);
+    // A manual refresh is the moment someone is diagnosing a problem, so let
+    // the endpoint probing describe itself in full again.
+    AuthService.resetProbeLogging();
     await _syncAllData();
 
     // Refresh exam data too, so the exam tab isn't left stale.
@@ -735,8 +952,10 @@ class UserProvider extends ChangeNotifier {
     try {
       await _scheduleClassNotifications();
     } catch (e) {
-      _log.log('Failed scheduling class notifications: $e',
-          level: LogLevel.warning);
+      _log.log(
+        'Failed scheduling class notifications: $e',
+        level: LogLevel.warning,
+      );
     }
 
     try {
@@ -774,8 +993,14 @@ class UserProvider extends ChangeNotifier {
       }
     }
 
-    final token = _accessToken;
-    if (token == null) return _educationProgram;
+    final token = await ensureValidToken();
+    if (token == null) {
+      _log.log(
+        'Chương trình đào tạo: không có phiên đăng nhập hợp lệ',
+        level: LogLevel.warning,
+      );
+      return _educationProgram;
+    }
 
     _isLoadingEducationProgram = true;
     notifyListeners();
@@ -800,6 +1025,14 @@ class UserProvider extends ChangeNotifier {
       // Fall back to whatever is cached so the screen still shows something.
       if (_educationProgram.isEmpty) {
         _educationProgram = await _db.getEducationProgram();
+
+        final cachedMarks = await _db.getAllMarks();
+        _marksBySemester = <int, List<StudentSubjectMark>>{};
+        for (final mark in cachedMarks) {
+          _marksBySemester.putIfAbsent(mark.semesterId, () => []).add(mark);
+        }
+        _behaviorMarks = await _db.getBehaviorMarks();
+        _tuition = await _db.getTuition() ?? StudentTuition.empty;
       }
     } finally {
       _isLoadingEducationProgram = false;
@@ -813,45 +1046,125 @@ class UserProvider extends ChangeNotifier {
   // Marks, behaviour scores and tuition
   // ===========================================================================
 
-  /// Subject marks for one semester. Returns an empty list rather than throwing
-  /// so a single failing semester never breaks the whole marks screen.
+  /// Pulls điểm, rèn luyện and học phí and writes them to SQLite.
+  ///
+  /// Called from [_syncAllData] at login and on a manual refresh, so the
+  /// Tiện ích screens read from the cache instead of hitting four endpoints
+  /// every time they are opened. Each part is independent: a failure in one
+  /// leaves the others - and the previous cache - intact.
+  Future<void> syncUtilitiesData() async {
+    if (_isSyncingUtilities) return;
+    _isSyncingUtilities = true;
+    notifyListeners();
+
+    try {
+      final token = await ensureValidToken();
+      if (token == null) {
+        _log.log(
+          'Tiện ích: không có phiên hợp lệ, giữ dữ liệu đã lưu',
+          level: LogLevel.warning,
+        );
+        return;
+      }
+
+      // Marks, one request per semester the student has actually studied.
+      final semesters = allSemesters;
+      if (semesters.isNotEmpty) {
+        final collected = <int, List<StudentSubjectMark>>{};
+        for (final semester in semesters) {
+          try {
+            final marks = await _withValidToken(
+              'Điểm kỳ ${semester.id}',
+              (t) => _authService.getStudentMarks(t, semester.id),
+              const <StudentSubjectMark>[],
+            );
+            if (marks.isNotEmpty) {
+              collected[semester.id] = marks;
+              await _db.saveMarksForSemester(semester.id, marks);
+            }
+          } catch (e) {
+            _log.log('Điểm kỳ ${semester.id}: $e', level: LogLevel.warning);
+          }
+        }
+        if (collected.isNotEmpty) {
+          _marksBySemester = collected;
+          _log.log(
+            'Đã lưu điểm: ${collected.length} kỳ, '
+            '${allMarks.length} học phần',
+            level: LogLevel.success,
+          );
+        }
+      }
+
+      try {
+        final behavior = await _withValidToken(
+          'Điểm rèn luyện',
+          _authService.getBehaviorMarks,
+          const <StudentBehaviorMark>[],
+        );
+        if (behavior.isNotEmpty) {
+          _behaviorMarks = behavior;
+          await _db.saveBehaviorMarks(behavior);
+          _log.log(
+            'Đã lưu ${behavior.length} kỳ điểm rèn luyện',
+            level: LogLevel.success,
+          );
+        }
+      } catch (e) {
+        _log.log('Điểm rèn luyện: $e', level: LogLevel.warning);
+      }
+
+      try {
+        final tuition = await _withValidToken(
+          'Học phí',
+          _authService.getStudentPayable,
+          StudentTuition.empty,
+        );
+        if (!tuition.isEmpty) {
+          _tuition = tuition;
+          await _db.saveTuition(tuition);
+          _log.log(
+            'Đã lưu học phí: ${tuition.fees.length} khoản, '
+            '${tuition.payments.length} biên lai',
+            level: LogLevel.success,
+          );
+        }
+      } catch (e) {
+        _log.log('Học phí: $e', level: LogLevel.warning);
+      }
+    } finally {
+      _isSyncingUtilities = false;
+      notifyListeners();
+    }
+  }
+
+  /// Marks for one semester, straight from the cache.
+  ///
+  /// Kept as a Future so existing callers do not have to change; it no longer
+  /// touches the network - [syncUtilitiesData] owns that.
   Future<List<StudentSubjectMark>> fetchStudentMarks(int semesterId) async {
-    final token = _accessToken;
-    if (token == null) return const <StudentSubjectMark>[];
+    final cached = _marksBySemester[semesterId];
+    if (cached != null) return cached;
 
-    try {
-      return await _authService.getStudentMarks(token, semesterId);
-    } catch (e) {
-      _log.log('Could not load marks for semester $semesterId: $e',
-          level: LogLevel.warning);
-      return const <StudentSubjectMark>[];
+    final fromDb = await _db.getMarksForSemester(semesterId);
+    if (fromDb.isNotEmpty) {
+      _marksBySemester[semesterId] = fromDb;
     }
+    return fromDb;
   }
 
-  /// Behaviour (rèn luyện) scores across every semester.
+  /// Conduct scores from the cache.
   Future<List<StudentBehaviorMark>> fetchBehaviorMarks() async {
-    final token = _accessToken;
-    if (token == null) return const <StudentBehaviorMark>[];
-
-    try {
-      return await _authService.getBehaviorMarks(token);
-    } catch (e) {
-      _log.log('Could not load behavior marks: $e', level: LogLevel.warning);
-      return const <StudentBehaviorMark>[];
-    }
+    if (_behaviorMarks.isNotEmpty) return _behaviorMarks;
+    _behaviorMarks = await _db.getBehaviorMarks();
+    return _behaviorMarks;
   }
 
-  /// Tuition / payable records for the signed-in student.
-  Future<List<StudentTuition>> fetchStudentPayable() async {
-    final token = _accessToken;
-    if (token == null) return const <StudentTuition>[];
-
-    try {
-      return await _authService.getStudentPayable(token);
-    } catch (e) {
-      _log.log('Could not load tuition data: $e', level: LogLevel.warning);
-      return const <StudentTuition>[];
-    }
+  /// Tuition from the cache.
+  Future<StudentTuition> fetchStudentPayable() async {
+    if (!_tuition.isEmpty) return _tuition;
+    _tuition = await _db.getTuition() ?? StudentTuition.empty;
+    return _tuition;
   }
 
   // ===========================================================================
@@ -875,8 +1188,10 @@ class UserProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      _log.log('Could not read notification permission: $e',
-          level: LogLevel.warning);
+      _log.log(
+        'Could not read notification permission: $e',
+        level: LogLevel.warning,
+      );
     }
   }
 
@@ -948,8 +1263,10 @@ class UserProvider extends ChangeNotifier {
         _log.log('Daily summary cancelled', level: LogLevel.info);
       }
     } catch (e) {
-      _log.log('Failed toggling daily notifications: $e',
-          level: LogLevel.error);
+      _log.log(
+        'Failed toggling daily notifications: $e',
+        level: LogLevel.error,
+      );
     }
   }
 
@@ -960,8 +1277,9 @@ class UserProvider extends ChangeNotifier {
     final semester = _selectedSemester;
     if (semester == null || _courses.isEmpty || _courseHours.isEmpty) return;
 
-    final semesterStart =
-        DateTime.fromMillisecondsSinceEpoch(semester.startDate);
+    final semesterStart = DateTime.fromMillisecondsSinceEpoch(
+      semester.startDate,
+    );
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

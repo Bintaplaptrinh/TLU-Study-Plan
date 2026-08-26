@@ -910,6 +910,15 @@ int? _digInt(Map<String, dynamic>? json, List<String> paths) {
   return int.tryParse(value.toString());
 }
 
+/// [_dig] coerced to a double, tolerating numeric strings.
+double? _digDouble(Map<String, dynamic>? json, List<String> paths) {
+  final value = _dig(json, paths);
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString().replaceAll(',', ''));
+}
+
 /// Reads a nested object at the first path that holds a Map.
 Map<String, dynamic>? _digMap(Map<String, dynamic>? json, List<String> paths) {
   final value = _dig(json, paths);
@@ -1033,10 +1042,7 @@ class ExamRoomDetail {
       ]),
       duration: _digInt(json, ['duration', 'examDuration']),
       examDate: _digInt(json, ['examDate', 'dateExam', 'examRoom.examDate']),
-      examDateString: _digStringOrNull(json, [
-        'examDateString',
-        'examDateStr',
-      ]),
+      examDateString: _digStringOrNull(json, ['examDateString', 'examDateStr']),
       numberExpectedStudent: _digInt(json, [
         'numberExpectedStudent',
         'numberOfStudent',
@@ -1104,166 +1110,492 @@ class Room {
 }
 
 /// StudentSubjectMark represents student's mark for a subject
+/// One course result (điểm học phần).
+///
+/// Shape confirmed against
+/// `GET /api/studentsubjectmark/getListStudentMarkBySemesterByLoginUser/{id}`,
+/// which answers with a bare list. The course and semester are nested objects,
+/// not flat fields - reading them as flat was why the marks screen stayed
+/// empty even when the request succeeded.
 class StudentSubjectMark {
   final int id;
   final String subjectCode;
   final String subjectName;
   final int credits;
-  final double? mark10;
-  final double? mark4;
-  final String? markLetter;
-  final String? markText;
   final int semesterId;
   final String semesterName;
-  final bool isPassed;
 
-  StudentSubjectMark({
+  /// Final course mark on the 10-point scale (TKHP).
+  final double? mark10;
+
+  /// Same result on the 4-point scale.
+  final double? mark4;
+
+  /// Letter grade (A, B+, ...).
+  final String? markLetter;
+
+  /// Component marks: continuous assessment and the exam itself.
+  final double? markProcess;
+  final double? markExam;
+
+  /// "ĐẠT" / "KHÔNG ĐẠT" style verdict from the portal.
+  final String? result;
+
+  /// Which attempt this row represents.
+  final int examRound;
+  final int studyTime;
+
+  /// Whether the course counts toward the GPA, and whether the portal has
+  /// published the result yet.
+  final bool isCounted;
+  final bool isPublished;
+
+  const StudentSubjectMark({
     required this.id,
     required this.subjectCode,
     required this.subjectName,
     required this.credits,
+    required this.semesterId,
+    required this.semesterName,
     this.mark10,
     this.mark4,
     this.markLetter,
-    this.markText,
-    required this.semesterId,
-    required this.semesterName,
-    required this.isPassed,
+    this.markProcess,
+    this.markExam,
+    this.result,
+    this.examRound = 1,
+    this.studyTime = 1,
+    this.isCounted = true,
+    this.isPublished = true,
   });
 
+  /// True when there is a passing letter grade or a numeric pass.
+  bool get isPassed {
+    final letter = (markLetter ?? '').toUpperCase();
+    if (letter.isNotEmpty) return letter != 'F' && letter != 'D-';
+    final verdict = (result ?? '').toUpperCase();
+    if (verdict.contains('KHÔNG')) return false;
+    if (verdict.contains('ĐẠT')) return true;
+    final m = mark10;
+    return m != null && m >= 4;
+  }
+
   factory StudentSubjectMark.fromJson(Map<String, dynamic> json) {
-    // Helper to safely parse numeric fields
-    int parseIntField(dynamic value, int defaultValue) {
-      if (value == null) return defaultValue;
-      if (value is int) return value;
-      if (value is double) return value.toInt();
-      if (value is String) return int.tryParse(value) ?? defaultValue;
-      return defaultValue;
-    }
-
-    double? parseDoubleField(dynamic value) {
-      if (value == null) return null;
-      if (value is double) return value;
-      if (value is int) return value.toDouble();
-      if (value is String) return double.tryParse(value);
-      return null;
-    }
-
-    bool parseBoolField(dynamic value, bool defaultValue) {
-      if (value == null) return defaultValue;
-      if (value is bool) return value;
-      if (value is int) return value != 0;
-      if (value is String) {
-        final lower = value.toLowerCase();
-        if (lower == 'true' || lower == '1') return true;
-        if (lower == 'false' || lower == '0') return false;
-      }
-      return defaultValue;
-    }
+    final subject = _digMap(json, ['subject']) ?? const <String, dynamic>{};
+    final semester = _digMap(json, ['semester']) ?? const <String, dynamic>{};
 
     return StudentSubjectMark(
-      id: parseIntField(json['id'], 0),
-      subjectCode: json['subjectCode']?.toString() ?? '',
-      subjectName: json['subjectName']?.toString() ?? '',
-      credits: parseIntField(json['credits'], 0),
-      mark10: parseDoubleField(json['mark10']),
-      mark4: parseDoubleField(json['mark4']),
-      markLetter: json['markLetter']?.toString(),
-      markText: json['markText']?.toString(),
-      semesterId: parseIntField(json['semesterId'], 0),
-      semesterName: json['semesterName']?.toString() ?? '',
-      isPassed: parseBoolField(json['isPassed'], false),
+      id: _digInt(json, ['id']) ?? 0,
+      subjectCode: _digString(json, [
+        'subject.subjectCode',
+        'subjectCode',
+        'equivalentSubjectCode',
+      ]),
+      subjectName: _digString(json, [
+        'subject.subjectName',
+        'subjectName',
+        'equivalentSubjectName',
+      ]),
+      credits: _digInt(json, ['subject.numberOfCredit', 'numberOfCredit']) ?? 0,
+      semesterId: _digInt(json, ['semesterId', 'semester.id']) ?? 0,
+      semesterName: _digString(json, [
+        'semester.semesterName',
+        'semester.semesterCode',
+        'semesterName',
+      ]),
+      mark10: _digDouble(json, ['mark']),
+      mark4: _digDouble(json, ['mark4']),
+      markLetter: _digStringOrNull(json, ['charMark']),
+      markProcess: _digDouble(json, ['markQT']),
+      markExam: _digDouble(json, ['markTHI']),
+      result: _digStringOrNull(json, ['result', 'status']),
+      examRound: _digInt(json, ['examRound']) ?? 1,
+      studyTime: _digInt(json, ['studyTime']) ?? 1,
+      isCounted: json['isCounted'] != false,
+      isPublished: json['isPublished'] != false,
+      // Referenced so the analyzer keeps the locals meaningful even when the
+      // portal omits the nested objects entirely.
+    )._withFallback(subject, semester);
+  }
+
+  /// Fills code/name/credits from the nested objects when the flat lookup
+  /// found nothing (some rows carry only one of the two forms).
+  StudentSubjectMark _withFallback(
+    Map<String, dynamic> subject,
+    Map<String, dynamic> semester,
+  ) {
+    if (subjectCode.isNotEmpty && semesterName.isNotEmpty) return this;
+    return StudentSubjectMark(
+      id: id,
+      subjectCode: subjectCode.isNotEmpty
+          ? subjectCode
+          : (subject['subjectCode']?.toString() ?? ''),
+      subjectName: subjectName.isNotEmpty
+          ? subjectName
+          : (subject['subjectName']?.toString() ?? ''),
+      credits: credits != 0
+          ? credits
+          : ((subject['numberOfCredit'] as num?)?.toInt() ?? 0),
+      semesterId: semesterId,
+      semesterName: semesterName.isNotEmpty
+          ? semesterName
+          : (semester['semesterName']?.toString() ?? ''),
+      mark10: mark10,
+      mark4: mark4,
+      markLetter: markLetter,
+      markProcess: markProcess,
+      markExam: markExam,
+      result: result,
+      examRound: examRound,
+      studyTime: studyTime,
+      isCounted: isCounted,
+      isPublished: isPublished,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'subjectCode': subjectCode,
+    'subjectName': subjectName,
+    'credits': credits,
+    'semesterId': semesterId,
+    'semesterName': semesterName,
+    'mark10': mark10,
+    'mark4': mark4,
+    'markLetter': markLetter,
+    'markProcess': markProcess,
+    'markExam': markExam,
+    'result': result,
+    'examRound': examRound,
+    'studyTime': studyTime,
+    'isCounted': isCounted,
+    'isPublished': isPublished,
+  };
+
+  factory StudentSubjectMark.fromCache(Map<String, dynamic> json) {
+    return StudentSubjectMark(
+      id: _digInt(json, ['id']) ?? 0,
+      subjectCode: _digString(json, ['subjectCode']),
+      subjectName: _digString(json, ['subjectName']),
+      credits: _digInt(json, ['credits']) ?? 0,
+      semesterId: _digInt(json, ['semesterId']) ?? 0,
+      semesterName: _digString(json, ['semesterName']),
+      mark10: _digDouble(json, ['mark10']),
+      mark4: _digDouble(json, ['mark4']),
+      markLetter: _digStringOrNull(json, ['markLetter']),
+      markProcess: _digDouble(json, ['markProcess']),
+      markExam: _digDouble(json, ['markExam']),
+      result: _digStringOrNull(json, ['result']),
+      examRound: _digInt(json, ['examRound']) ?? 1,
+      studyTime: _digInt(json, ['studyTime']) ?? 1,
+      isCounted: json['isCounted'] != false && json['isCounted'] != 0,
+      isPublished: json['isPublished'] != false && json['isPublished'] != 0,
     );
   }
 }
 
-/// StudentBehaviorMark represents student's behavior mark for a semester
+/// One semester's conduct score (điểm rèn luyện).
+///
+/// `GET /api/student_semester_behavior_mark/viewStudentBehaviorMarkByLoginUser`
+/// returns a single object, not a list: the semesters sit two levels down at
+/// `schoolYearBehaviorMarks[].semesterMarks[]`. [listFromResponse] does that
+/// walk so callers get the flat list they expect.
 class StudentBehaviorMark {
   final int id;
   final int semesterId;
   final String semesterName;
+  final String schoolYearName;
   final int mark;
   final String classification;
-  final String? note;
 
-  StudentBehaviorMark({
+  const StudentBehaviorMark({
     required this.id,
     required this.semesterId,
     required this.semesterName,
+    required this.schoolYearName,
     required this.mark,
     required this.classification,
+  });
+
+  /// Flattens the nested response into one row per semester, newest first.
+  static List<StudentBehaviorMark> listFromResponse(dynamic decoded) {
+    final results = <StudentBehaviorMark>[];
+
+    void addSemester(Map<String, dynamic> row, String schoolYear) {
+      final mark = _digInt(row, ['mark', 'totalMarkStudent']) ?? 0;
+
+      // The readable grade sits in `sort` ("Khá"). `classification` is an
+      // object whose own name field comes back empty, and `code` is a criteria
+      // number like "2.3" - neither is usable, so both are skipped.
+      var grade = _digString(row, [
+        'sort',
+        'classification.classificationName',
+        'classification.name',
+        'classificationName',
+        'level.name',
+      ]);
+      if (grade.isEmpty) grade = classifyBehaviorMark(mark);
+
+      results.add(
+        StudentBehaviorMark(
+          id: _digInt(row, ['id']) ?? 0,
+          semesterId: _digInt(row, ['semester.id', 'semesterId']) ?? 0,
+          semesterName: _digString(row, [
+            'semester.semesterName',
+            'semester.semesterCode',
+            'semesterName',
+          ]),
+          schoolYearName: schoolYear,
+          mark: mark,
+          classification: grade,
+        ),
+      );
+    }
+
+    void walkYear(dynamic year) {
+      if (year is! Map) return;
+      final map = Map<String, dynamic>.from(year);
+      final name = _digString(map, [
+        'schoolYear.name',
+        'schoolYear.displayName',
+        'schoolYearName',
+      ]);
+      final semesters = map['semesterMarks'];
+      if (semesters is List && semesters.isNotEmpty) {
+        for (final row in semesters) {
+          if (row is Map) addSemester(Map<String, dynamic>.from(row), name);
+        }
+      } else {
+        // A year with no per-semester breakdown still carries its own score.
+        addSemester(map, name);
+      }
+    }
+
+    if (decoded is Map) {
+      final years = decoded['schoolYearBehaviorMarks'];
+      if (years is List) {
+        for (final year in years) {
+          walkYear(year);
+        }
+      }
+    } else if (decoded is List) {
+      for (final year in decoded) {
+        walkYear(year);
+      }
+    }
+
+    results.sort((a, b) => b.semesterId.compareTo(a.semesterId));
+    return results;
+  }
+
+  factory StudentBehaviorMark.fromJson(Map<String, dynamic> json) {
+    final mark = _digInt(json, ['mark']) ?? 0;
+    var grade = _digString(json, ['classification', 'sort']);
+    if (grade.isEmpty) grade = classifyBehaviorMark(mark);
+
+    return StudentBehaviorMark(
+      id: _digInt(json, ['id']) ?? 0,
+      semesterId: _digInt(json, ['semesterId', 'semester.id']) ?? 0,
+      semesterName: _digString(json, ['semesterName', 'semester.semesterName']),
+      schoolYearName: _digString(json, ['schoolYearName', 'schoolYear.name']),
+      mark: mark,
+      classification: grade,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'semesterId': semesterId,
+    'semesterName': semesterName,
+    'schoolYearName': schoolYearName,
+    'mark': mark,
+    'classification': classification,
+  };
+}
+
+/// Vietnamese conduct grade for a score out of 100.
+///
+/// Only used as a fallback: the portal normally supplies the label itself.
+String classifyBehaviorMark(int mark) {
+  if (mark >= 90) return 'Xuất sắc';
+  if (mark >= 80) return 'Tốt';
+  if (mark >= 65) return 'Khá';
+  if (mark >= 50) return 'Trung bình';
+  if (mark >= 35) return 'Yếu';
+  return 'Kém';
+}
+
+/// One tuition line: either an amount owed for a semester, or a payment made.
+class TuitionEntry {
+  final int id;
+  final String semesterName;
+  final double amount;
+  final double amountPaid;
+  final String? dateString;
+  final String? note;
+
+  /// True for a receipt (đã nộp), false for an amount still payable.
+  final bool isPayment;
+
+  const TuitionEntry({
+    required this.id,
+    required this.semesterName,
+    required this.amount,
+    required this.amountPaid,
+    required this.isPayment,
+    this.dateString,
     this.note,
   });
 
-  factory StudentBehaviorMark.fromJson(Map<String, dynamic> json) {
-    // Handle both int and double for numeric fields
-    int parseIntField(dynamic value, int defaultValue) {
-      if (value == null) return defaultValue;
-      if (value is int) return value;
-      if (value is double) return value.toInt();
-      if (value is String) return int.tryParse(value) ?? defaultValue;
-      return defaultValue;
-    }
+  double get outstanding => (amount - amountPaid).clamp(0, double.infinity);
 
-    return StudentBehaviorMark(
-      id: parseIntField(json['id'], 0),
-      semesterId: parseIntField(json['semesterId'], 0),
-      semesterName: json['semesterName']?.toString() ?? '',
-      mark: parseIntField(json['mark'], 0),
-      classification: json['classification']?.toString() ?? '',
-      note: json['note']?.toString(),
+  factory TuitionEntry.fromReceivable(Map<String, dynamic> json) {
+    return TuitionEntry(
+      id: _digInt(json, ['id']) ?? 0,
+      semesterName: _digString(json, [
+        'semester.semesterName',
+        'semester.semesterCode',
+        'semesterName',
+      ]),
+      amount: _digDouble(json, ['amount', 'calculateAmount']) ?? 0,
+      amountPaid: _digDouble(json, ['amountReceived', 'amountDone']) ?? 0,
+      isPayment: false,
+      note: _digStringOrNull(json, ['note', 'type']),
     );
   }
+
+  factory TuitionEntry.fromReceipt(Map<String, dynamic> json) {
+    return TuitionEntry(
+      id: _digInt(json, ['id']) ?? 0,
+      semesterName: _digString(json, [
+        'semester.semesterName',
+        'semester.semesterCode',
+        'semesterName',
+      ]),
+      amount: _digDouble(json, ['totalRecivedAmount', 'totalAmount']) ?? 0,
+      amountPaid: _digDouble(json, ['totalRecivedAmount', 'totalAmount']) ?? 0,
+      isPayment: true,
+      dateString: _digStringOrNull(json, ['voucherDate', 'createDate']),
+      note: _digStringOrNull(json, ['note', 'paymentMethod', 'code']),
+    );
+  }
+
+  factory TuitionEntry.fromCache(Map<String, dynamic> json) {
+    return TuitionEntry(
+      id: _digInt(json, ['id']) ?? 0,
+      semesterName: _digString(json, ['semesterName']),
+      amount: _digDouble(json, ['amount']) ?? 0,
+      amountPaid: _digDouble(json, ['amountPaid']) ?? 0,
+      isPayment: json['isPayment'] == true || json['isPayment'] == 1,
+      dateString: _digStringOrNull(json, ['dateString']),
+      note: _digStringOrNull(json, ['note']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'semesterName': semesterName,
+    'amount': amount,
+    'amountPaid': amountPaid,
+    'isPayment': isPayment,
+    'dateString': dateString,
+    'note': note,
+  };
 }
 
-/// StudentTuition represents student's tuition payment information
+/// The whole học phí picture for the signed-in student.
+///
+/// `GET /api/student/viewstudentpayablebyLoginUser` answers with a summary
+/// object - totals plus two lists - rather than the flat list the old model
+/// expected, so every row was being discarded.
 class StudentTuition {
-  final int semesterId;
-  final String semesterName;
-  final double tuitionFee;
-  final double paidAmount;
-  final double remainingAmount;
-  final String paymentStatus;
-  final String? paymentDeadline;
+  final double totalReceivable;
+  final double totalReceived;
+  final double totalOutstanding;
 
-  StudentTuition({
-    required this.semesterId,
-    required this.semesterName,
-    required this.tuitionFee,
-    required this.paidAmount,
-    required this.remainingAmount,
-    required this.paymentStatus,
-    this.paymentDeadline,
+  /// Amounts owed, one per semester.
+  final List<TuitionEntry> fees;
+
+  /// Receipts, newest last as the portal returns them.
+  final List<TuitionEntry> payments;
+
+  const StudentTuition({
+    required this.totalReceivable,
+    required this.totalReceived,
+    required this.totalOutstanding,
+    required this.fees,
+    required this.payments,
   });
 
-  factory StudentTuition.fromJson(Map<String, dynamic> json) {
-    // Helper functions for safe parsing
-    int parseIntField(dynamic value, int defaultValue) {
-      if (value == null) return defaultValue;
-      if (value is int) return value;
-      if (value is double) return value.toInt();
-      if (value is String) return int.tryParse(value) ?? defaultValue;
-      return defaultValue;
-    }
+  static const StudentTuition empty = StudentTuition(
+    totalReceivable: 0,
+    totalReceived: 0,
+    totalOutstanding: 0,
+    fees: <TuitionEntry>[],
+    payments: <TuitionEntry>[],
+  );
 
-    double parseDoubleField(dynamic value, double defaultValue) {
-      if (value == null) return defaultValue;
-      if (value is double) return value;
-      if (value is int) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? defaultValue;
-      return defaultValue;
+  bool get isEmpty => fees.isEmpty && payments.isEmpty;
+
+  static List<TuitionEntry> _entries(
+    dynamic list,
+    TuitionEntry Function(Map<String, dynamic>) build,
+  ) {
+    if (list is! List) return const <TuitionEntry>[];
+    return list
+        .whereType<Map>()
+        .map((row) => build(Map<String, dynamic>.from(row)))
+        .toList();
+  }
+
+  factory StudentTuition.fromJson(Map<String, dynamic> json) {
+    final fees = _entries(json['receiveAbleDtos'], TuitionEntry.fromReceivable);
+    final payments = _entries(json['receivedDtos'], TuitionEntry.fromReceipt);
+
+    final receivable =
+        _digDouble(json, ['totalReceiveAble']) ??
+        fees.fold<double>(0, (sum, e) => sum + e.amount);
+    final received =
+        _digDouble(json, ['totalReceived']) ??
+        payments.fold<double>(0, (sum, e) => sum + e.amount);
+
+    return StudentTuition(
+      totalReceivable: receivable,
+      totalReceived: received,
+      totalOutstanding:
+          _digDouble(json, ['totalReceiveAbleNotComplete']) ??
+          (receivable - received).clamp(0, double.infinity),
+      fees: fees,
+      payments: payments,
+    );
+  }
+
+  factory StudentTuition.fromCache(Map<String, dynamic> json) {
+    List<TuitionEntry> read(String key) {
+      final list = json[key];
+      if (list is! List) return const <TuitionEntry>[];
+      return list
+          .whereType<Map>()
+          .map((e) => TuitionEntry.fromCache(Map<String, dynamic>.from(e)))
+          .toList();
     }
 
     return StudentTuition(
-      semesterId: parseIntField(json['semesterId'], 0),
-      semesterName: json['semesterName']?.toString() ?? '',
-      tuitionFee: parseDoubleField(json['tuitionFee'], 0.0),
-      paidAmount: parseDoubleField(json['paidAmount'], 0.0),
-      remainingAmount: parseDoubleField(json['remainingAmount'], 0.0),
-      paymentStatus: json['paymentStatus']?.toString() ?? '',
-      paymentDeadline: json['paymentDeadline']?.toString(),
+      totalReceivable: _digDouble(json, ['totalReceivable']) ?? 0,
+      totalReceived: _digDouble(json, ['totalReceived']) ?? 0,
+      totalOutstanding: _digDouble(json, ['totalOutstanding']) ?? 0,
+      fees: read('fees'),
+      payments: read('payments'),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'totalReceivable': totalReceivable,
+    'totalReceived': totalReceived,
+    'totalOutstanding': totalOutstanding,
+    'fees': fees.map((e) => e.toJson()).toList(),
+    'payments': payments.map((e) => e.toJson()).toList(),
+  };
 }
 
 /// One course in the student's education program (chương trình đào tạo).
@@ -1323,27 +1655,67 @@ class ProgramSubject {
   }
 
   Map<String, dynamic> toJson() => {
-        'knowledgeBlock': knowledgeBlock,
-        'subjectCode': subjectCode,
-        'subjectName': subjectName,
-        'credits': credits,
-        'semesterLabel': semesterLabel,
-        'isRequired': isRequired,
-      };
+    'knowledgeBlock': knowledgeBlock,
+    'subjectCode': subjectCode,
+    'subjectName': subjectName,
+    'credits': credits,
+    'semesterLabel': semesterLabel,
+    'isRequired': isRequired,
+  };
 
-  /// Walks the `programsubject/tree` response and returns every leaf course.
+  /// Flattens the `programsubject/tree` response into a list of courses.
   ///
-  /// Accepts either the raw list or a `{content: [...]}` envelope, and treats
-  /// any node with children as a knowledge block whose name is inherited by
-  /// everything beneath it.
+  /// The portal answers this endpoint in two different shapes depending on the
+  /// program, and the earlier version only understood the first:
+  ///
+  ///  * **Nested** - inner nodes are knowledge blocks and leaves are courses.
+  ///  * **Flat** - a plain list where each entry names its own block in a
+  ///    field (and may point at a parent by id).
+  ///
+  /// On the flat shape every entry looks like a leaf with no ancestor, so the
+  /// block came out empty for all of them and the Chương trình đào tạo screen
+  /// collapsed into a single "Khác" group. Both shapes are handled now.
   static List<ProgramSubject> fromTree(dynamic tree) {
+    final root = tree is Map && tree['content'] != null
+        ? tree['content']
+        : tree;
+
+    // Blocks are also resolvable by id, for flat responses that only carry a
+    // parent reference rather than a name.
+    final blockNamesById = <String, String>{};
+    void indexBlocks(dynamic node) {
+      if (node is List) {
+        for (final child in node) {
+          indexBlocks(child);
+        }
+        return;
+      }
+      if (node is! Map) return;
+      final map = Map<String, dynamic>.from(node);
+      final id = _digString(map, ['id', 'programSubjectId']);
+      final name = _digString(map, ['name', 'displayName', 'groupName']);
+      final hasCode = _digString(map, [
+        'subject.subjectCode',
+        'subjectCode',
+        'code',
+      ]).isNotEmpty;
+      // A named node without its own course code is a block heading.
+      if (id.isNotEmpty && name.isNotEmpty && !hasCode) {
+        blockNamesById[id] = name;
+      }
+      final children = _dig(map, ['children', 'nodes', 'subNodes', 'items']);
+      if (children != null) indexBlocks(children);
+    }
+
+    indexBlocks(root);
+
     final results = <ProgramSubject>[];
     final seen = <String>{};
 
-    void walk(dynamic node, String block) {
+    void walk(dynamic node, String inheritedBlock) {
       if (node is List) {
         for (final child in node) {
-          walk(child, block);
+          walk(child, inheritedBlock);
         }
         return;
       }
@@ -1351,27 +1723,54 @@ class ProgramSubject {
 
       final map = Map<String, dynamic>.from(node);
 
-      final children = _dig(map, ['children', 'nodes', 'subNodes', 'items']);
       final name = _digString(map, [
         'subject.subjectName',
+        'displaySubjectName',
         'subjectName',
         'name',
         'displayName',
       ]);
 
-      if (children is List && children.isNotEmpty) {
-        // Inner node: its own name becomes the block for everything below.
-        walk(children, name.isNotEmpty ? name : block);
-        return;
-      }
-
       final code = _digString(map, [
         'subject.subjectCode',
+        'displaySubjectCode',
         'subjectCode',
         'code',
       ]);
 
-      // Leaves without a course code are empty groups, not courses.
+      // The block this entry belongs to, in order of trustworthiness: a name
+      // carried on the entry itself, a parent it points at by id, then
+      // whatever the enclosing node passed down.
+      final ownBlock = _digString(map, [
+        // Confirmed against programsubject/tree: the block name lives here.
+        'knowledgeProgram.knowledgeBlock.name',
+        'knowledgeProgram.displayName',
+        'knowledgeBlock.name',
+        'knowledgeBlock',
+        'subjectGroup.name',
+        'programSubjectGroup.name',
+        'subjectGroupName',
+        'groupName',
+        'blockName',
+        'parent.name',
+        'khoiKienThuc',
+      ]);
+      final parentId = _digString(map, ['parentId', 'parent.id']);
+      final block = ownBlock.isNotEmpty
+          ? ownBlock
+          : (blockNamesById[parentId] ?? inheritedBlock);
+
+      final children = _dig(map, ['children', 'nodes', 'subNodes', 'items']);
+      final hasChildren = children is List && children.isNotEmpty;
+
+      // A node can be both a course and a heading, so recurse first and still
+      // fall through to record this entry when it carries a course code.
+      if (hasChildren) {
+        walk(children, name.isNotEmpty ? name : block);
+        if (code.isEmpty) return;
+      }
+
+      // Entries with neither a code nor a subject payload are empty groups.
       if (code.isEmpty && name.isEmpty) return;
       if (code.isEmpty && _dig(map, ['subject']) == null) return;
 
@@ -1386,37 +1785,46 @@ class ProgramSubject {
         'isCompulsory',
       ]);
 
-      // The portal encodes the requirement in the block label itself
-      // ("Kiến thức tự chọn (Tự chọn)"), which is more reliable than any
-      // per-node flag - the flag is often absent entirely.
-      final category = _blockCategory(block).toLowerCase();
-      final blockSaysElective = category.contains('tự chọn');
+      // knowledgeProgram.blockType is the portal's own classification:
+      //   1 = compulsory, 2 = elective, 3 = certificate-style requirement.
+      final blockType = _digInt(map, ['knowledgeProgram.blockType']);
 
-      results.add(ProgramSubject(
-        knowledgeBlock: block,
-        subjectCode: code,
-        subjectName: name,
-        credits: _digInt(map, [
-              'subject.numberOfCredit',
-              'numberOfCredit',
-              'credits',
-              'credit',
-            ]) ??
-            0,
-        semesterLabel: _digString(map, [
-          'semester',
-          'semesterName',
-          'termNumber',
-          'hocKy',
-          'studySemester',
-        ]),
-        isRequired: compulsory != null
-            ? (compulsory == true || compulsory == 1)
-            : !blockSaysElective,
-      ));
+      // Falls back to the label, which some programs write as
+      // "Kiến thức tự chọn (Tự chọn)".
+      final blockSaysElective =
+          _blockCategory(block).toLowerCase().contains('tự chọn') ||
+          block.toLowerCase().contains('tự chọn');
+
+      results.add(
+        ProgramSubject(
+          knowledgeBlock: block,
+          subjectCode: code,
+          subjectName: name,
+          credits:
+              _digInt(map, [
+                'subject.numberOfCredit',
+                'numberOfCredit',
+                'credits',
+                'credit',
+                'soTinChi',
+              ]) ??
+              0,
+          semesterLabel: _digString(map, [
+            'semesterIndex',
+            'semester.semesterName',
+            'semester',
+            'semesterName',
+            'termNumber',
+            'hocKy',
+            'studySemester',
+          ]),
+          isRequired: compulsory != null
+              ? (compulsory == true || compulsory == 1)
+              : (blockType != null ? blockType != 2 : !blockSaysElective),
+        ),
+      );
     }
 
-    final root = tree is Map && tree['content'] != null ? tree['content'] : tree;
     walk(root, '');
     return results;
   }
@@ -1425,4 +1833,3 @@ class ProgramSubject {
 /// Total credits across [subjects].
 int totalProgramCredits(List<ProgramSubject> subjects) =>
     subjects.fold(0, (sum, s) => sum + s.credits);
-

@@ -4,6 +4,7 @@ import 'package:tlustudy_planner/providers/exam_provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/models/api_response.dart';
 import 'package:tlustudy_planner/widgets/styled_dropdown.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
 
 class ExamScheduleScreen extends StatefulWidget {
   const ExamScheduleScreen({super.key});
@@ -134,7 +135,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
           floating: true,
           snap: true,
           elevation: 0,
-          title: Text(
+          title: TrText(
             'Lịch thi',
             style: Theme.of(
               context,
@@ -151,7 +152,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    TrText(
                       'Chọn học kỳ',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -169,7 +170,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                                 value: semester.id,
                                 child: Row(
                                   children: [
-                                    Text(
+                                    TrText(
                                       semester.semesterName,
                                       style: Theme.of(context)
                                           .textTheme
@@ -193,7 +194,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                                             12,
                                           ),
                                         ),
-                                        child: Text(
+                                        child: TrText(
                                           'Hiện tại',
                                           style: Theme.of(context)
                                               .textTheme
@@ -221,7 +222,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                         },
                       )
                     else
-                      Text(
+                      TrText(
                         userProvider.selectedSemester?.semesterName ??
                             'Không có học kỳ',
                         style: Theme.of(context).textTheme.bodyLarge,
@@ -242,7 +243,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    TrText(
                       'Đợt học',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -256,7 +257,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                           .map(
                             (period) => DropdownMenuItem<int>(
                               value: period.id,
-                              child: Text(
+                              child: TrText(
                                 period.name,
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -299,7 +300,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    TrText(
                       'Lần thi',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -312,7 +313,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                           .map(
                             (round) => DropdownMenuItem<int>(
                               value: round,
-                              child: Text(
+                              child: TrText(
                                 'Lần $round',
                                 style: Theme.of(context)
                                     .textTheme
@@ -380,7 +381,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                     color: Theme.of(context).colorScheme.error,
                   ),
                   const SizedBox(height: 16),
-                  Text(
+                  TrText(
                     examProvider.roomErrorMessage!,
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
@@ -399,7 +400,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                       }
                     },
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Thử lại'),
+                    label: const TrText('Thử lại'),
                   ),
                 ],
               ),
@@ -422,14 +423,14 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                   color: Theme.of(context).colorScheme.outline,
                 ),
                 const SizedBox(height: 16),
-                Text(
+                TrText(
                   'Chưa có thông tin phòng thi',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                TrText(
                   'Vui lòng chọn đợt học và lần thi',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
@@ -449,7 +450,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                       );
                     },
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Tải lại'),
+                    label: const TrText('Tải lại'),
                   ),
               ],
             ),
@@ -493,7 +494,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                       color: Theme.of(context).colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
+                    child: TrText(
                       'STT ${index + 1}',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -506,13 +507,13 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        TrText(
                           examRoom.subjectName,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         if (examRoom.examCode != null)
-                          Text(
+                          TrText(
                             'Số báo danh: ${examRoom.examCode}',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
@@ -556,13 +557,13 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                 if (examRoom.examRoom!.numberExpectedStudent != null)
                   _buildDetailRow(
                     context,
-                    'Số sinh viên dự kiến',
+                    'Số báo danh',
                     '${examRoom.examRoom!.numberExpectedStudent}',
                     Icons.people,
                   ),
               ] else ...[
                 Center(
-                  child: Text(
+                  child: TrText(
                     'Chưa có thông tin phòng thi',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.outline,
@@ -593,13 +594,13 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                TrText(
                   label,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
                 ),
-                Text(
+                TrText(
                   value,
                   style: Theme.of(
                     context,
@@ -626,12 +627,12 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
               color: Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(height: 16),
-            Text(
+            TrText(
               'Chưa đăng nhập',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            Text(
+            TrText(
               'Vui lòng đăng nhập để xem lịch thi',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.outline,
@@ -657,12 +658,12 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
               color: Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(height: 16),
-            Text(
+            TrText(
               'Chưa chọn học kỳ',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            Text(
+            TrText(
               'Vui lòng chọn học kỳ trong cài đặt',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.outline,
@@ -692,12 +693,12 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
               color: Theme.of(context).colorScheme.error,
             ),
             const SizedBox(height: 16),
-            Text(
+            TrText(
               'Lỗi tải dữ liệu',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            Text(
+            TrText(
               error,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.outline,
@@ -708,7 +709,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Thử lại'),
+              label: const TrText('Thử lại'),
             ),
           ],
         ),
@@ -729,12 +730,12 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
               color: Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(height: 16),
-            Text(
+            TrText(
               'Không có lịch thi',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            Text(
+            TrText(
               'Chưa có lịch thi nào được công bố cho học kỳ này',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.outline,

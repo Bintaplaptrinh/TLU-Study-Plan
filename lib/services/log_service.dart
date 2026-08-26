@@ -17,14 +17,14 @@ class LogService {
       message: message,
       level: level,
     );
-    
+
     _logs.add(entry);
-    
+
     // Keep only last 500 logs
     if (_logs.length > _maxLogs) {
       _logs.removeFirst();
     }
-    
+
     // Still print to console for debugging
     print(_formatLogEntry(entry));
   }
@@ -41,24 +41,25 @@ class LogService {
   /// Format log entry for display
   String _formatLogEntry(LogEntry entry) {
     final icon = _getLogIcon(entry.level);
-    final timestamp = '${entry.timestamp.hour.toString().padLeft(2, '0')}:'
+    final timestamp =
+        '${entry.timestamp.hour.toString().padLeft(2, '0')}:'
         '${entry.timestamp.minute.toString().padLeft(2, '0')}:'
         '${entry.timestamp.second.toString().padLeft(2, '0')}';
-    return '$icon [$timestamp] ${entry.message}';
+    return '${icon.padRight(5)} [$timestamp] ${entry.message}';
   }
 
   String _getLogIcon(LogLevel level) {
     switch (level) {
       case LogLevel.debug:
-        return 'Debug';
+        return 'DEBUG';
       case LogLevel.info:
-        return 'Inofo';
+        return 'INFO';
       case LogLevel.warning:
-        return 'Warning';
+        return 'WARN';
       case LogLevel.error:
-        return 'Error';
+        return 'ERROR';
       case LogLevel.success:
-        return 'Success';
+        return 'OK';
     }
   }
 
@@ -70,11 +71,11 @@ class LogService {
     buffer.writeln('Total entries: ${_logs.length}');
     buffer.writeln('=' * 40);
     buffer.writeln();
-    
+
     for (final entry in _logs) {
       buffer.writeln(_formatLogEntry(entry));
     }
-    
+
     return buffer.toString();
   }
 }
@@ -93,10 +94,4 @@ class LogEntry {
 }
 
 /// Log levels
-enum LogLevel {
-  debug,
-  info,
-  warning,
-  error,
-  success,
-}
+enum LogLevel { debug, info, warning, error, success }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tlustudy_planner/theme/app_theme.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
 
 class ChooseDateScreen extends StatefulWidget {
   const ChooseDateScreen({super.key, required this.initialDate});
@@ -45,7 +46,7 @@ class _ChooseDateScreenState extends State<ChooseDateScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Choose Date'),
+        title: const TrText('Choose Date'),
       ),
       body: Column(
         children: [
@@ -84,7 +85,7 @@ class _ChooseDateScreenState extends State<ChooseDateScreen> {
                     ),
                     elevation: 2,
                   ),
-                  child: Text(
+                  child: TrText(
                     'CONTINUE',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.w700,
@@ -124,7 +125,7 @@ class _MonthCalendar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        TrText(
           monthLabel,
           style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
@@ -169,7 +170,7 @@ class _MonthCalendar extends StatelessWidget {
           .map(
             (label) => Expanded(
               child: Center(
-                child: Text(
+                child: TrText(
                   label,
                   style: Theme.of(context)
                       .textTheme
@@ -214,17 +215,9 @@ class _DateCell extends StatelessWidget {
             color: isToday ? AppTheme.accentColor : colorScheme.outlineVariant.withOpacity(0.3),
             width: isToday ? 2 : 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isSelected ? 0.16 : 0.06),
-              blurRadius: isSelected ? 16 : 12,
-              offset: const Offset(0, 8),
-              spreadRadius: -4,
-            ),
-          ],
         ),
         child: Center(
-          child: Text(
+          child: TrText(
             '${date.day}',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,

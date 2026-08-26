@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tlustudy_planner/models/schedule.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
 
 class ScheduleCard extends StatelessWidget {
   final Schedule schedule;
@@ -105,7 +106,7 @@ class ScheduleCard extends StatelessWidget {
                         ),
                       ),
                       // End time - compact
-                      Text(
+                      TrText(
                         'đến ${schedule.endTime.hour.toString().padLeft(2, '0')}:${schedule.endTime.minute.toString().padLeft(2, '0')}',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: colorScheme.onPrimaryContainer.withValues(
@@ -126,7 +127,7 @@ class ScheduleCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Course name - single line
-                      Text(
+                      TrText(
                         schedule.course.name,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
@@ -141,7 +142,7 @@ class ScheduleCard extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
+                          TrText(
                             schedule.course.code,
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
@@ -162,7 +163,7 @@ class ScheduleCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 2),
                           Expanded(
-                            child: Text(
+                            child: TrText(
                               schedule.course.classroom,
                               style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(

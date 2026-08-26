@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tlustudy_planner/services/log_service.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
+import 'package:tlustudy_planner/widgets/app_snackbar.dart';
+import 'package:tlustudy_planner/services/auth_service.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
@@ -33,17 +36,21 @@ class _LogsScreenState extends State<LogsScreen> {
   @override
   Widget build(BuildContext context) {
     final logs = _logService.getAllLogs();
-    
+
     // Auto-scroll after build
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('System Logs'),
+        title: const TrText('System Logs'),
         actions: [
           // Auto-scroll toggle
           IconButton(
-            icon: Icon(_autoScroll ? Icons.arrow_downward : Icons.arrow_downward_outlined),
+            icon: Icon(
+              _autoScroll
+                  ? Icons.arrow_downward
+                  : Icons.arrow_downward_outlined,
+            ),
             tooltip: _autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF',
             onPressed: () {
               setState(() {
@@ -58,11 +65,11 @@ class _LogsScreenState extends State<LogsScreen> {
             onPressed: () {
               final logsText = _logService.exportLogs();
               Clipboard.setData(ClipboardData(text: logsText));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Logs copied to clipboard'),
-                  duration: Duration(seconds: 2),
-                ),
+              showAppSnackBar(
+                context,
+                'Logs copied to clipboard',
+                tone: SnackTone.success,
+                duration: const Duration(seconds: 2),
               );
             },
           ),
@@ -74,20 +81,23 @@ class _LogsScreenState extends State<LogsScreen> {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Clear logs?'),
-                  content: const Text('This will delete all log entries.'),
+                  title: const TrText('Clear logs?'),
+                  content: const TrText('This will delete all log entries.'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                      child: const TrText('Cancel'),
                     ),
                     TextButton(
                       onPressed: () {
                         _logService.clearLogs();
+                        // Re-arm the detailed API probing so the next visit to
+                        // Tiện ích reports every endpoint it tries again.
+                        AuthService.resetProbeLogging();
                         setState(() {});
                         Navigator.pop(context);
                       },
-                      child: const Text('Clear'),
+                      child: const TrText('Clear'),
                     ),
                   ],
                 ),
@@ -115,11 +125,11 @@ class _LogsScreenState extends State<LogsScreen> {
                     color: Theme.of(context).colorScheme.outline,
                   ),
                   const SizedBox(height: 16),
-                  Text(
+                  TrText(
                     'No logs yet',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                   ),
                 ],
               ),
@@ -138,11 +148,11 @@ class _LogsScreenState extends State<LogsScreen> {
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
-                      Text(
+                      TrText(
                         '${logs.length} log entries (max 500)',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -165,7 +175,8 @@ class _LogsScreenState extends State<LogsScreen> {
 
   Widget _buildLogEntry(BuildContext context, LogEntry log) {
     final color = _getLogColor(context, log.level);
-    final timestamp = '${log.timestamp.hour.toString().padLeft(2, '0')}:'
+    final timestamp =
+        '${log.timestamp.hour.toString().padLeft(2, '0')}:'
         '${log.timestamp.minute.toString().padLeft(2, '0')}:'
         '${log.timestamp.second.toString().padLeft(2, '0')}';
 
@@ -173,18 +184,16 @@ class _LogsScreenState extends State<LogsScreen> {
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.3),
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withOpacity(0.3),
           ),
         ),
       ),
       child: ListTile(
         dense: true,
-        leading: Icon(
-          _getLogIcon(log.level),
-          size: 20,
-          color: color,
-        ),
-        title: Text(
+        leading: Icon(_getLogIcon(log.level), size: 20, color: color),
+        title: TrText(
           log.message,
           style: TextStyle(
             fontSize: 12,
@@ -192,7 +201,7 @@ class _LogsScreenState extends State<LogsScreen> {
             color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
-        subtitle: Text(
+        subtitle: TrText(
           timestamp,
           style: TextStyle(
             fontSize: 10,

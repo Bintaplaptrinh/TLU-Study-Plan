@@ -1,13 +1,15 @@
 name: tlustudy_planner
 description: "TLU Study Planner for TLU students"
 publish_to: 'none'
-version: 1.0.1
+version: 2.0.0
 
 environment:
   sdk: ^3.9.2
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   provider: ^6.1.5+1
   shared_preferences: ^2.5.5
@@ -24,6 +26,10 @@ dependencies:
   android_alarm_manager_plus: ^5.1.1  # For exact daily alarms
   home_widget: ^0.9.3  # For home screen widget
   intl: ^0.20.3  # For date formatting
+  material_symbols_icons: ^4.2960.0  # Google Material Symbols (rounded)
+  geolocator: ^14.0.3  # Device location for the weather card
+  translator: ^1.0.4+1  # On-the-fly vi/en translation
+  flutter_secure_storage: ^11.0.0  # Keystore/Keychain for the login credentials
 
 dev_dependencies:
   flutter_test:

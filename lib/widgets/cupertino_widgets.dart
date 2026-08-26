@@ -1,5 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
+
+import 'package:tlustudy_planner/theme/app_colors.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
 
 class AppSymbol {
 	const AppSymbol(this.cupertinoName, this.materialIcon);
@@ -9,28 +12,29 @@ class AppSymbol {
 }
 
 class AppIcons {
-	static const calendarToday = AppSymbol('calendar', Icons.calendar_today_outlined);
-	static const calendarMonth = AppSymbol('calendar.badge.clock', Icons.calendar_month);
-	static const exams = AppSymbol('doc.text.magnifyingglass', Icons.quiz);
-	static const settings = AppSymbol('gearshape', Icons.settings);
-	static const checkCircle = AppSymbol('checkmark.circle.fill', Icons.check_circle);
-	static const downloadCloud = AppSymbol('icloud.and.arrow.down', Icons.cloud_download);
-	static const check = AppSymbol('checkmark', Icons.check);
-	static const lock = AppSymbol('lock', Icons.lock_outlined);
-	static const notificationsOn = AppSymbol('bell.fill', Icons.notifications);
-	static const notificationsOff = AppSymbol('bell.slash', Icons.notifications_off);
-	static const warning = AppSymbol('exclamationmark.triangle.fill', Icons.warning_amber);
-	static const error = AppSymbol('xmark.circle.fill', Icons.error);
-	static const info = AppSymbol('info.circle', Icons.info);
-	static const add = AppSymbol('plus', Icons.add);
-	static const close = AppSymbol('xmark', Icons.close);
-	static const refresh = AppSymbol('arrow.clockwise', Icons.refresh);
-	static const schedule = AppSymbol('calendar.badge.clock', Icons.schedule);
-	static const sync = AppSymbol('arrow.triangle.2.circlepath', Icons.sync);
-	static const today = AppSymbol('calendar.today', Icons.today);
-	static const calendar = AppSymbol('calendar', Icons.calendar_month);
-	static const sun = AppSymbol('sun.max', Icons.wb_sunny);
-	static const utilities = AppSymbol('square.grid.2x2', Icons.apps);
+	// Google Material Symbols (rounded) — https://fonts.google.com/icons
+	static const calendarToday = AppSymbol('calendar', Symbols.calendar_today_rounded);
+	static const calendarMonth = AppSymbol('calendar.badge.clock', Symbols.calendar_month_rounded);
+	static const exams = AppSymbol('doc.text.magnifyingglass', Symbols.quiz_rounded);
+	static const settings = AppSymbol('gearshape', Symbols.settings_rounded);
+	static const checkCircle = AppSymbol('checkmark.circle.fill', Symbols.check_circle_rounded);
+	static const downloadCloud = AppSymbol('icloud.and.arrow.down', Symbols.cloud_download_rounded);
+	static const check = AppSymbol('checkmark', Symbols.check_rounded);
+	static const lock = AppSymbol('lock', Symbols.lock_rounded);
+	static const notificationsOn = AppSymbol('bell.fill', Symbols.notifications_active_rounded);
+	static const notificationsOff = AppSymbol('bell.slash', Symbols.notifications_off_rounded);
+	static const warning = AppSymbol('exclamationmark.triangle.fill', Symbols.warning_rounded);
+	static const error = AppSymbol('xmark.circle.fill', Symbols.error_rounded);
+	static const info = AppSymbol('info.circle', Symbols.info_rounded);
+	static const add = AppSymbol('plus', Symbols.add_rounded);
+	static const close = AppSymbol('xmark', Symbols.close_rounded);
+	static const refresh = AppSymbol('arrow.clockwise', Symbols.refresh_rounded);
+	static const schedule = AppSymbol('calendar.badge.clock', Symbols.schedule_rounded);
+	static const sync = AppSymbol('arrow.triangle.2.circlepath', Symbols.sync_rounded);
+	static const today = AppSymbol('calendar.today', Symbols.home_rounded);
+	static const calendar = AppSymbol('calendar', Symbols.calendar_month_rounded);
+	static const sun = AppSymbol('sun.max', Symbols.sunny_rounded);
+	static const utilities = AppSymbol('square.grid.2x2', Symbols.apps_rounded);
 }
 
 class AppIcon extends StatelessWidget {
@@ -53,6 +57,8 @@ class AppIcon extends StatelessWidget {
 			symbol.materialIcon,
 			color: color,
 			size: size,
+			weight: 500,
+			opticalSize: size ?? 24,
 		);
 	}
 }
@@ -114,7 +120,7 @@ class AppButton extends StatelessWidget {
 					button = FilledButton.icon(
 						onPressed: isLoading ? null : onPressed,
 						icon: Icon(icon.materialIcon),
-						label: Text(label),
+						label: TrText(label),
 					);
 				} else {
 					button = FilledButton(
@@ -125,7 +131,7 @@ class AppButton extends StatelessWidget {
 									width: 20,
 									child: CircularProgressIndicator(strokeWidth: 2),
 								)
-							: Text(label),
+							: TrText(label),
 					);
 				}
 				break;
@@ -134,19 +140,19 @@ class AppButton extends StatelessWidget {
 					button = OutlinedButton.icon(
 						onPressed: isLoading ? null : onPressed,
 						icon: Icon(icon.materialIcon),
-						label: Text(label),
+						label: TrText(label),
 					);
 				} else {
 					button = OutlinedButton(
 						onPressed: isLoading ? null : onPressed,
-						child: Text(label),
+						child: TrText(label),
 					);
 				}
 				break;
 			case AppButtonVariant.text:
 				button = TextButton(
 					onPressed: isLoading ? null : onPressed,
-					child: Text(label),
+					child: TrText(label),
 				);
 				break;
 		}
@@ -215,7 +221,7 @@ class AppFab extends StatelessWidget {
 			return FloatingActionButton.extended(
 				onPressed: onPressed,
 				icon: Icon(icon!.materialIcon),
-				label: Text(label),
+				label: TrText(label),
 				backgroundColor: color,
 			);
 		}
@@ -252,33 +258,33 @@ class AppTabBar extends StatelessWidget {
 
 	@override
 	Widget build(BuildContext context) {
-		final isCupertino = Theme.of(context).platform == TargetPlatform.iOS ||
-				Theme.of(context).platform == TargetPlatform.macOS;
-		
-		if (isCupertino) {
-			return CupertinoTabBar(
-				currentIndex: currentIndex,
-				onTap: onTap,
-				items: [
-					for (final item in items)
-						BottomNavigationBarItem(
-							icon: Icon(item.symbol.materialIcon),
-							label: item.label,
-						),
-				],
-			);
-		}
-		
-		return NavigationBar(
-			selectedIndex: currentIndex,
-			onDestinationSelected: onTap,
-			destinations: [
-				for (final item in items)
-					NavigationDestination(
-						icon: Icon(item.symbol.materialIcon),
-						label: item.label,
-					),
-			],
+		return Container(
+			decoration: BoxDecoration(
+				color: AppColors.surface(context),
+				border: Border(
+					top: BorderSide(color: AppColors.border(context)),
+				),
+			),
+			child: SafeArea(
+				top: false,
+				child: NavigationBar(
+					selectedIndex: currentIndex,
+					onDestinationSelected: onTap,
+					backgroundColor: Colors.transparent,
+					surfaceTintColor: Colors.transparent,
+					elevation: 0,
+					destinations: [
+						for (final item in items)
+							NavigationDestination(
+								icon: Icon(item.symbol.materialIcon,
+										weight: 400, opticalSize: 24),
+								selectedIcon: Icon(item.symbol.materialIcon,
+										fill: 1, weight: 600, opticalSize: 24),
+								label: context.tr(item.label),
+							),
+					],
+				),
+			),
 		);
 	}
 }

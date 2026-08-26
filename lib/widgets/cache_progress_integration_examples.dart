@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:tlustudy_planner/providers/exam_provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/widgets/cache_progress_banner.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
+import 'package:tlustudy_planner/widgets/app_snackbar.dart';
 
 /// Example of how to integrate the cache progress banner
 /// into your main screen or home screen
@@ -14,7 +16,7 @@ class ExampleIntegration extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TLU Study Planner'),
+        title: const TrText('TLU Study Planner'),
       ),
       body: Column(
         children: [
@@ -24,13 +26,13 @@ class ExampleIntegration extends StatelessWidget {
             child: ListView(
               children: [
                 ListTile(
-                  title: const Text('Thời khóa biểu'),
+                  title: const TrText('Thời khóa biểu'),
                   onTap: () {
                     // Navigate to schedule screen
                   },
                 ),
                 ListTile(
-                  title: const Text('Lịch thi'),
+                  title: const TrText('Lịch thi'),
                   onTap: () {
                   },
                 ),
@@ -52,7 +54,7 @@ class ExampleWithOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TLU Study Planner'),
+        title: const TrText('TLU Study Planner'),
       ),
       body: Stack(
         children: [
@@ -82,7 +84,7 @@ class YourMainContent extends StatelessWidget {
         children: const [
           Icon(Icons.calendar_today, size: 64),
           SizedBox(height: 16),
-          Text('Your App Content Here'),
+          TrText('Your App Content Here'),
         ],
       ),
     );
@@ -115,25 +117,23 @@ class ManualCacheButton extends StatelessWidget {
               
               // Show success message
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã tải xong dữ liệu offline'),
-                    backgroundColor: Colors.green,
-                  ),
+                showAppSnackBar(
+                  context,
+                  'Đã tải xong dữ liệu offline',
+                  tone: SnackTone.success,
                 );
               }
             } else {
               // No token - show login required
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Vui lòng đăng nhập để tải dữ liệu'),
-                  backgroundColor: Colors.orange,
-                ),
+              showAppSnackBar(
+                context,
+                'Vui lòng đăng nhập để tải dữ liệu',
+                tone: SnackTone.warning,
               );
             }
           },
           icon: const Icon(Icons.cloud_download),
-          label: const Text('Tải dữ liệu offline'),
+          label: const TrText('Tải dữ liệu offline'),
         );
       },
     );
@@ -154,7 +154,7 @@ class CacheStatusWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                const TrText(
                   'Trạng thái dữ liệu offline',
                   style: TextStyle(
                     fontSize: 16,
@@ -179,7 +179,7 @@ class CacheStatusWidget extends StatelessWidget {
                               : Colors.orange,
                     ),
                     const SizedBox(width: 8),
-                    Text(
+                    TrText(
                       examProvider.preCacheProgress == 100
                           ? 'Đã sẵn sàng'
                           : examProvider.isPreCaching
@@ -209,14 +209,14 @@ class CacheStatusWidget extends StatelessWidget {
                 const SizedBox(height: 8),
                 
                 // Progress text
-                Text(
+                TrText(
                   '${examProvider.preCacheProgress}% hoàn thành',
                   style: const TextStyle(fontSize: 12),
                 ),
                 
                 if (examProvider.preCacheTotalSemesters > 0) ...[
                   const SizedBox(height: 4),
-                  Text(
+                  TrText(
                     'Học kỳ: ${examProvider.preCacheCurrentSemester}/${examProvider.preCacheTotalSemesters}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
@@ -224,7 +224,7 @@ class CacheStatusWidget extends StatelessWidget {
                 
                 if (examProvider.isPreCaching) ...[
                   const SizedBox(height: 8),
-                  Text(
+                  TrText(
                     examProvider.preCacheStatus,
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                     maxLines: 2,

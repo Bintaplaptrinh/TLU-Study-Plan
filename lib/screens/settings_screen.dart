@@ -12,6 +12,11 @@ import 'package:tlustudy_planner/widgets/cupertino_widgets.dart';
 // import 'package:tlustudy_planner/services/daily_notification_service.dart'; // Commented out with test button
 
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:tlustudy_planner/i18n/tr_text.dart';
+import 'package:tlustudy_planner/widgets/app_snackbar.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:tlustudy_planner/i18n/locale_provider.dart';
+import 'package:tlustudy_planner/widgets/calendar_widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -50,7 +55,7 @@ class SettingsScreen extends StatelessWidget {
                               color: colorScheme.onPrimary.withOpacity(0.7),
                             ),
                             const SizedBox(height: 12),
-                            Text(
+                            TrText(
                               'Chưa đăng nhập',
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
@@ -74,16 +79,9 @@ class SettingsScreen extends StatelessWidget {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: colorScheme.surface,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
                             ),
                             child: Center(
-                              child: Text(
+                              child: TrText(
                                 user.fullName.isNotEmpty
                                     ? user.fullName[0].toUpperCase()
                                     : '?',
@@ -96,7 +94,7 @@ class SettingsScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          Text(
+                          TrText(
                             user.fullName,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
@@ -106,7 +104,7 @@ class SettingsScreen extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 4),
-                          Text(
+                          TrText(
                             user.studentId,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
@@ -121,7 +119,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            title: Text(
+            title: TrText(
               '',
               style: TextStyle(
                 color: colorScheme.onPrimary,
@@ -133,7 +131,7 @@ class SettingsScreen extends StatelessWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Text(
+            child: TrText(
               'Tài khoản',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
@@ -176,7 +174,7 @@ class SettingsScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  TrText(
                                     'Đã đăng nhập',
                                     style: Theme.of(context)
                                         .textTheme
@@ -184,7 +182,7 @@ class SettingsScreen extends StatelessWidget {
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
+                                  TrText(
                                     userProvider.currentUser.studentId,
                                     style: Theme.of(context)
                                         .textTheme
@@ -204,11 +202,11 @@ class SettingsScreen extends StatelessWidget {
                           variant: AppButtonVariant.secondary,
                           onPressed: () {
                             userProvider.logout();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Đã đăng xuất'),
-                                duration: const Duration(seconds: 2),
-                              ),
+                            showAppSnackBar(
+                              context,
+                              'Đã đăng xuất',
+                              tone: SnackTone.success,
+                              duration: const Duration(seconds: 2),
                             );
                           },
                           expand: true,
@@ -233,7 +231,7 @@ class SettingsScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  TrText(
                                     'Chưa đăng nhập',
                                     style: Theme.of(context)
                                         .textTheme
@@ -241,7 +239,7 @@ class SettingsScreen extends StatelessWidget {
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
+                                  TrText(
                                     'Đăng nhập để xem lịch học',
                                     style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
@@ -278,7 +276,7 @@ class SettingsScreen extends StatelessWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Text(
+            child: TrText(
               'Dữ liệu',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
@@ -337,7 +335,7 @@ class SettingsScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                TrText(
                                   'Cập nhật dữ liệu',
                                   style: Theme.of(context)
                                       .textTheme
@@ -345,7 +343,7 @@ class SettingsScreen extends StatelessWidget {
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
+                                TrText(
                                   lastReload != null
                                       ? daysSinceReload! == 0
                                           ? 'Cập nhật hôm nay'
@@ -368,7 +366,7 @@ class SettingsScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Text(
+                      TrText(
                         'Cập nhật dữ liệu',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
@@ -394,7 +392,7 @@ class SettingsScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
+                                child: TrText(
                                   'Đã quá 30 ngày kể từ lần cập nhật cuối. Nên cập nhật dữ liệu mới',
                                   style: Theme.of(context)
                                       .textTheme
@@ -415,8 +413,6 @@ class SettingsScreen extends StatelessWidget {
                             ? AppButtonVariant.primary
                             : AppButtonVariant.secondary,
                         onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          
                           try {
                             // Show loading dialog
                             showDialog(
@@ -432,7 +428,7 @@ class SettingsScreen extends StatelessWidget {
                                         children: [
                                           const CircularProgressIndicator(),
                                           const SizedBox(height: 16),
-                                          Text(
+                                          TrText(
                                             provider.loginProgress.isNotEmpty
                                                 ? provider.loginProgress
                                                 : 'Đang cập nhật...',
@@ -453,21 +449,20 @@ class SettingsScreen extends StatelessWidget {
 
                             if (context.mounted) {
                               Navigator.of(context).pop(); // Close loading dialog
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text('Đã cập nhật dữ liệu thành công'),
-                                  duration: Duration(seconds: 2),
-                                ),
+                              showAppSnackBar(
+                                context,
+                                'Đã cập nhật dữ liệu thành công',
+                                tone: SnackTone.success,
+                                duration: const Duration(seconds: 2),
                               );
                             }
                           } catch (e) {
                             if (context.mounted) {
                               Navigator.of(context).pop(); // Close loading dialog
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('Lỗi: ${e.toString()}'),
-                                  duration: const Duration(seconds: 3),
-                                ),
+                              showAppSnackBar(
+                                context,
+                                'Lỗi: ${e.toString()}',
+                                tone: SnackTone.error,
                               );
                             }
                           }
@@ -485,7 +480,7 @@ class SettingsScreen extends StatelessWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Text(
+            child: TrText(
               'Thông báo',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
@@ -523,7 +518,7 @@ class SettingsScreen extends StatelessWidget {
                                           : AppIcons.notificationsOff,
                                     ),
                                     const SizedBox(width: 16),
-                                    Text(
+                                    TrText(
                                       'Thông báo lịch học',
                                       style: Theme.of(
                                         context,
@@ -534,7 +529,7 @@ class SettingsScreen extends StatelessWidget {
                                 const SizedBox(height: 4),
                                 Padding(
                                   padding: const EdgeInsets.only(left: 40),
-                                  child: Text(
+                                  child: TrText(
                                     'Nhận thông báo trước giờ học và thi',
                                     style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
@@ -559,13 +554,11 @@ class SettingsScreen extends StatelessWidget {
                               if (context.mounted) {
                                 if (value && !success) {
                                   // User tried to enable but permission denied
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        '⚠️ Không thể bật thông báo - cần cấp quyền',
-                                      ),
-                                      duration: const Duration(seconds: 3),
-                                      action: SnackBarAction(
+                                  showAppSnackBar(
+                                    context,
+                                    'Không thể bật thông báo - cần cấp quyền',
+                                    tone: SnackTone.warning,
+                                    action: SnackBarAction(
                                         label: 'Cài đặt',
                                         onPressed: () async {
                                           try {
@@ -599,20 +592,17 @@ class SettingsScreen extends StatelessWidget {
                                             );
                                           }
                                         },
-                                      ),
                                     ),
                                   );
                                 } else if (success) {
                                   // Only show success message if toggle actually changed
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        value
-                                            ? 'Đã bật thông báo'
-                                            : 'Đã tắt thông báo',
-                                      ),
-                                      duration: const Duration(seconds: 2),
-                                    ),
+                                  showAppSnackBar(
+                                    context,
+                                    value
+                                        ? 'Đã bật thông báo'
+                                        : 'Đã tắt thông báo',
+                                    tone: SnackTone.success,
+                                    duration: const Duration(seconds: 2),
                                   );
                                 }
                               }
@@ -632,12 +622,12 @@ class SettingsScreen extends StatelessWidget {
                             symbol: AppIcons.warning,
                             color: Colors.orange,
                           ),
-                          title: Text(
+                          title: TrText(
                             'Cần cấp quyền thông báo',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                          subtitle: Text(
+                          subtitle: TrText(
                             'Vui lòng cấp quyền thông báo trong cài đặt hệ thống để nhận thông báo',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
@@ -674,22 +664,17 @@ class SettingsScreen extends StatelessWidget {
                               }
 
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Đã mở cài đặt - Vui lòng bật Thông báo',
-                                    ),
-                                    duration: const Duration(seconds: 3),
-                                  ),
+                                showAppSnackBar(
+                                  context,
+                                  'Đã mở cài đặt - Vui lòng bật Thông báo',
                                 );
                               }
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Lỗi: $e'),
-                                    duration: const Duration(seconds: 3),
-                                  ),
+                                showAppSnackBar(
+                                  context,
+                                  'Lỗi: $e',
+                                  tone: SnackTone.error,
                                 );
                               }
                             }
@@ -712,7 +697,7 @@ class SettingsScreen extends StatelessWidget {
                                     children: [
                                       const AppIcon(symbol: AppIcons.sun),
                                       const SizedBox(width: 16),
-                                      Text(
+                                      TrText(
                                         'Nhắc nhở hàng ngày',
                                         style: Theme.of(
                                           context,
@@ -723,7 +708,7 @@ class SettingsScreen extends StatelessWidget {
                                   const SizedBox(height: 4),
                                   Padding(
                                     padding: const EdgeInsets.only(left: 40),
-                                    child: Text(
+                                    child: TrText(
                                       'Nhận thông báo tóm tắt lịch học và thi mỗi sáng (7:00 AM)',
                                       style: Theme.of(context)
                                           .textTheme
@@ -746,15 +731,13 @@ class SettingsScreen extends StatelessWidget {
                                 );
 
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        value
-                                            ? 'Đã bật nhắc nhở hàng ngày'
-                                            : 'Đã tắt nhắc nhở hàng ngày',
-                                      ),
-                                      duration: const Duration(seconds: 2),
-                                    ),
+                                  showAppSnackBar(
+                                    context,
+                                    value
+                                        ? 'Đã bật nhắc nhở hàng ngày'
+                                        : 'Đã tắt nhắc nhở hàng ngày',
+                                    tone: SnackTone.success,
+                                    duration: const Duration(seconds: 2),
                                   );
                                 }
                               },
@@ -772,14 +755,14 @@ class SettingsScreen extends StatelessWidget {
                         //         if (context.mounted) {
                         //           ScaffoldMessenger.of(context).showSnackBar(
                         //             const SnackBar(
-                        //               content: Text('Đã kích hoạt kiểm tra thủ công - Xem log để biết kết quả'),
+                        //               content: TrText('Đã kích hoạt kiểm tra thủ công - Xem log để biết kết quả'),
                         //               duration: Duration(seconds: 3),
                         //             ),
                         //           );
                         //         }
                         //       },
                         //       icon: const Icon(Icons.bug_report, size: 18),
-                        //       label: const Text('Test ngay bây giờ'),
+                        //       label: const TrText('Test ngay bây giờ'),
                         //       style: OutlinedButton.styleFrom(
                         //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         //       ),
@@ -796,7 +779,7 @@ class SettingsScreen extends StatelessWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Text(
+            child: TrText(
               'Hiển thị',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
@@ -844,7 +827,7 @@ class SettingsScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 16),
-                          Text(
+                          TrText(
                             themeProvider.isDarkMode
                                 ? 'Chế độ tối'
                                 : 'Chế độ sáng',
@@ -866,10 +849,11 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
         ),
+        SliverToBoxAdapter(child: _buildLanguageCard(context)),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Text(
+            child: TrText(
               'Thông tin',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
@@ -893,13 +877,13 @@ class SettingsScreen extends StatelessWidget {
                   _buildInfoRowNoneIcon(
                     context,
                     'Phiên bản',
-                    '1.0.1',
+                    '2.0.0',
                   ),
                   const SizedBox(height: 16),
                   _buildInfoRowNoneIcon(
                     context,
                     'Ngày phát hành',
-                    '11-11-2025',
+                    '26-08-2026',
                   ),
                 ],
               ),
@@ -934,13 +918,13 @@ class SettingsScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              TrText(
                 label,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              Text(
+              TrText(
                 value,
                 style: Theme.of(
                   context,
@@ -965,13 +949,13 @@ class SettingsScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              TrText(
                 label,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              Text(
+              TrText(
                 value,
                 style: Theme.of(
                   context,
@@ -983,4 +967,95 @@ class SettingsScreen extends StatelessWidget {
       ],
     );
   }
+
+  /// Vietnamese / English switch. Text written in either language is
+  /// translated on the fly, so this only changes which one wins.
+  Widget _buildLanguageCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Consumer<LocaleProvider>(
+      builder: (context, localeProvider, _) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Symbols.translate_rounded,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 20,
+                      weight: 600,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TrText(
+                          'Ngôn ngữ',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        TrText(
+                          localeProvider.followSystem
+                              ? 'Theo ngôn ngữ của thiết bị'
+                              : 'Đã chọn thủ công',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              SegmentedPill<AppLanguage>(
+                value: localeProvider.language,
+                onChanged: localeProvider.setLanguage,
+                segments: const [
+                  SegmentItem(
+                    value: AppLanguage.vietnamese,
+                    label: 'Tiếng Việt',
+                  ),
+                  SegmentItem(
+                    value: AppLanguage.english,
+                    label: 'English',
+                  ),
+                ],
+              ),
+              if (!localeProvider.followSystem) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: localeProvider.useSystemLanguage,
+                    child: const TrText('Dùng ngôn ngữ thiết bị'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
 }

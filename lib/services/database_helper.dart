@@ -21,11 +21,57 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5, // Version 5: Add education_program table
+      version: 6, // Version 6: cache marks, behaviour scores and tuition
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
+
+  /// Tables for the Tiện ích screens. They are filled at login and on a manual
+  /// refresh, exactly like the timetable, so the screens read from SQLite and
+  /// work offline instead of hitting the API on every open.
+  static const String _createMarksTable = '''
+      CREATE TABLE student_marks (
+        id INTEGER PRIMARY KEY,
+        subjectCode TEXT NOT NULL,
+        subjectName TEXT NOT NULL,
+        credits INTEGER NOT NULL DEFAULT 0,
+        semesterId INTEGER NOT NULL,
+        semesterName TEXT,
+        mark10 REAL,
+        mark4 REAL,
+        markLetter TEXT,
+        markProcess REAL,
+        markExam REAL,
+        result TEXT,
+        examRound INTEGER NOT NULL DEFAULT 1,
+        studyTime INTEGER NOT NULL DEFAULT 1,
+        isCounted INTEGER NOT NULL DEFAULT 1,
+        isPublished INTEGER NOT NULL DEFAULT 1,
+        orderIndex INTEGER NOT NULL DEFAULT 0,
+        lastUpdated INTEGER NOT NULL
+      )
+    ''';
+
+  static const String _createBehaviorTable = '''
+      CREATE TABLE behavior_marks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        semesterId INTEGER NOT NULL,
+        semesterName TEXT,
+        schoolYearName TEXT,
+        mark INTEGER NOT NULL DEFAULT 0,
+        classification TEXT,
+        lastUpdated INTEGER NOT NULL
+      )
+    ''';
+
+  static const String _createTuitionTable = '''
+      CREATE TABLE tuition (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payload TEXT NOT NULL,
+        lastUpdated INTEGER NOT NULL
+      )
+    ''';
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -69,7 +115,7 @@ class DatabaseHelper {
         )
       ''');
     }
-    
+
     if (oldVersion < 3) {
       // Add cache progress tracking table
       await db.execute('''
@@ -83,7 +129,7 @@ class DatabaseHelper {
           lastUpdated INTEGER NOT NULL
         )
       ''');
-      
+
       // Insert initial row
       await db.insert('cache_progress', {
         'id': 1,
@@ -93,7 +139,7 @@ class DatabaseHelper {
         'lastUpdated': DateTime.now().millisecondsSinceEpoch,
       });
     }
-    
+
     if (oldVersion < 4) {
       // Add exam round cache metadata table
       // This tracks which semester+period+round combinations have been cached,
@@ -126,6 +172,12 @@ class DatabaseHelper {
         lastUpdated INTEGER NOT NULL
       )
       ''');
+    }
+
+    if (oldVersion < 6) {
+      await db.execute(_createMarksTable);
+      await db.execute(_createBehaviorTable);
+      await db.execute(_createTuitionTable);
     }
   }
 
@@ -266,7 +318,7 @@ class DatabaseHelper {
         lastUpdated INTEGER NOT NULL
       )
     ''');
-    
+
     // Insert initial row
     await db.insert('cache_progress', {
       'id': 1,
@@ -275,7 +327,7 @@ class DatabaseHelper {
       'cachedSemesters': 0,
       'lastUpdated': DateTime.now().millisecondsSinceEpoch,
     });
-    
+
     // Exam round cache metadata table
     // Tracks which semester+period+round combinations have been cached,
     // even if they returned empty results
@@ -305,6 +357,9 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute(_createMarksTable);
+    await db.execute(_createBehaviorTable);
+    await db.execute(_createTuitionTable);
   }
 
   // Save TLU user
@@ -660,6 +715,112 @@ class DatabaseHelper {
         .toList();
   }
 
+  // ===========================================================================
+  // Tiện ích: marks, behaviour scores, tuition
+  // ===========================================================================
+
+  /// Replaces the cached marks for [semesterId] only, so refreshing one
+  /// semester never wipes the rest.
+  Future<void> saveMarksForSemester(
+    int semesterId,
+    List<StudentSubjectMark> marks,
+  ) async {
+    final db = await database;
+    await db.delete(
+      'student_marks',
+      where: 'semesterId = ?',
+      whereArgs: [semesterId],
+    );
+
+    final batch = db.batch();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (var i = 0; i < marks.length; i++) {
+      final m = marks[i];
+      batch.insert('student_marks', {
+        ...m.toJson(),
+        'isCounted': m.isCounted ? 1 : 0,
+        'isPublished': m.isPublished ? 1 : 0,
+        'orderIndex': i,
+        'lastUpdated': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<StudentSubjectMark>> getMarksForSemester(int semesterId) async {
+    final db = await database;
+    final rows = await db.query(
+      'student_marks',
+      where: 'semesterId = ?',
+      whereArgs: [semesterId],
+      orderBy: 'orderIndex',
+    );
+    return rows.map(StudentSubjectMark.fromCache).toList();
+  }
+
+  /// Every cached mark, newest semester first - used for the overall GPA.
+  Future<List<StudentSubjectMark>> getAllMarks() async {
+    final db = await database;
+    final rows = await db.query(
+      'student_marks',
+      orderBy: 'semesterId DESC, orderIndex ASC',
+    );
+    return rows.map(StudentSubjectMark.fromCache).toList();
+  }
+
+  Future<void> saveBehaviorMarks(List<StudentBehaviorMark> marks) async {
+    final db = await database;
+    await db.delete('behavior_marks');
+
+    final batch = db.batch();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final m in marks) {
+      batch.insert('behavior_marks', {
+        'semesterId': m.semesterId,
+        'semesterName': m.semesterName,
+        'schoolYearName': m.schoolYearName,
+        'mark': m.mark,
+        'classification': m.classification,
+        'lastUpdated': now,
+      });
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<StudentBehaviorMark>> getBehaviorMarks() async {
+    final db = await database;
+    final rows = await db.query('behavior_marks', orderBy: 'semesterId DESC');
+    return rows
+        .map((r) => StudentBehaviorMark.fromJson(Map<String, dynamic>.from(r)))
+        .toList();
+  }
+
+  /// Tuition is a single summary object, so it is stored as one JSON row
+  /// rather than given a column per field.
+  Future<void> saveTuition(StudentTuition tuition) async {
+    final db = await database;
+    await db.delete('tuition');
+    await db.insert('tuition', {
+      'payload': jsonEncode(tuition.toJson()),
+      'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  Future<StudentTuition?> getTuition() async {
+    final db = await database;
+    final rows = await db.query('tuition', limit: 1);
+    if (rows.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(rows.first['payload'] as String);
+      if (decoded is Map) {
+        return StudentTuition.fromCache(Map<String, dynamic>.from(decoded));
+      }
+    } catch (_) {
+      // A corrupt row just means "no cache".
+    }
+    return null;
+  }
+
   // Clear all data
   Future<void> clearAllData() async {
     final db = await database;
@@ -823,18 +984,14 @@ class DatabaseHelper {
     }
 
     await batch.commit(noResult: true);
-    
-    await db.insert(
-      'exam_round_cache_metadata',
-      {
-        'semesterId': semesterId,
-        'registerPeriodId': registerPeriodId,
-        'examRound': examRound,
-        'roomCount': examRooms.length,
-        'lastCached': now,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+
+    await db.insert('exam_round_cache_metadata', {
+      'semesterId': semesterId,
+      'registerPeriodId': registerPeriodId,
+      'examRound': examRound,
+      'roomCount': examRooms.length,
+      'lastCached': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // Get exam rooms
@@ -935,12 +1092,12 @@ class DatabaseHelper {
   }
 
   // ==================== CACHE PROGRESS TRACKING ====================
-  
+
   /// Get current cache progress status
   Future<Map<String, dynamic>> getCacheProgress() async {
     final db = await database;
     final result = await db.query('cache_progress', where: 'id = 1');
-    
+
     if (result.isEmpty) {
       // Initialize if not exists
       await db.insert('cache_progress', {
@@ -959,10 +1116,10 @@ class DatabaseHelper {
         'lastUpdated': DateTime.now().millisecondsSinceEpoch,
       };
     }
-    
+
     return result.first;
   }
-  
+
   /// Update cache progress
   Future<void> updateCacheProgress({
     required int totalSemesters,
@@ -972,43 +1129,35 @@ class DatabaseHelper {
     String? currentSemesterName,
   }) async {
     final db = await database;
-    await db.update(
-      'cache_progress',
-      {
-        'isComplete': isComplete ? 1 : 0,
-        'totalSemesters': totalSemesters,
-        'cachedSemesters': cachedSemesters,
-        'currentSemesterId': currentSemesterId,
-        'currentSemesterName': currentSemesterName,
-        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'id = 1',
-    );
+    await db.update('cache_progress', {
+      'isComplete': isComplete ? 1 : 0,
+      'totalSemesters': totalSemesters,
+      'cachedSemesters': cachedSemesters,
+      'currentSemesterId': currentSemesterId,
+      'currentSemesterName': currentSemesterName,
+      'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+    }, where: 'id = 1');
   }
-  
+
   /// Reset cache progress (for resuming after app closure)
   Future<void> resetCacheProgress() async {
     final db = await database;
-    await db.update(
-      'cache_progress',
-      {
-        'isComplete': 0,
-        'totalSemesters': 0,
-        'cachedSemesters': 0,
-        'currentSemesterId': null,
-        'currentSemesterName': null,
-        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'id = 1',
-    );
+    await db.update('cache_progress', {
+      'isComplete': 0,
+      'totalSemesters': 0,
+      'cachedSemesters': 0,
+      'currentSemesterId': null,
+      'currentSemesterName': null,
+      'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+    }, where: 'id = 1');
   }
-  
+
   /// Check if caching is complete
   Future<bool> isCacheComplete() async {
     final progress = await getCacheProgress();
     return progress['isComplete'] == 1;
   }
-  
+
   /// Get list of semesters that have been cached
   Future<List<int>> getCachedSemesterIds() async {
     final db = await database;
