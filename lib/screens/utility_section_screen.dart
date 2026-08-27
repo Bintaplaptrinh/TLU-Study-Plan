@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:tlustudy_planner/models/api_response.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/theme/app_theme.dart';
+import 'package:tlustudy_planner/theme/app_colors.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
+import 'package:tlustudy_planner/widgets/detail_sheet.dart';
+import 'package:tlustudy_planner/widgets/page_header.dart';
+import 'package:tlustudy_planner/widgets/tuition_detail_sheet.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 
 /// Các mục con của "Tiện ích", mỗi mục là một trang riêng mở từ lưới thẻ.
 enum UtilitySection {
@@ -207,106 +213,61 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
     final userProvider = context.watch<UserProvider>();
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            // Nút back mặc định đã đúng hành vi; chỉ tô trắng cho nổi trên nền
-            // gradient.
-            iconTheme: const IconThemeData(color: Colors.white),
-            flexibleSpace: FlexibleSpaceBar(
-              title: TrText(
-                widget.section.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.white),
-                onPressed: _loadData,
-                tooltip: 'Tải lại',
-              ),
-            ],
+      backgroundColor: AppColors.bg(context),
+      body: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
           ),
-
-          // Dòng tóm tắt của riêng mục này.
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      widget.section.icon,
-                      color: AppTheme.primaryColor,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TrText(
-                          userProvider.tluUser?.displayName ?? 'Sinh viên',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        TrText(
-                          _tabSubtitle(userProvider),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
+          slivers: [
+            // Tiêu đề lớn canh trái, nút tải lại nằm cân ở mép phải. Không
+            // có nút back ở đây: thanh điều hướng dưới đáy đã thu lại thành
+            // nút back khi vào trang con.
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: widget.section.title,
+                subtitle: _tabSubtitle(userProvider),
+                actions: [
+                  HeaderIconButton(
+                    icon: Symbols.refresh_rounded,
+                    tooltip: 'Tải lại',
+                    onTap: _isLoading ? null : _loadData,
                   ),
                 ],
               ),
             ),
-          ),
 
-          if (widget.section == UtilitySection.marks) _buildMarksContent(theme),
-          if (widget.section == UtilitySection.behavior)
-            _buildBehaviorMarksContent(theme),
-          if (widget.section == UtilitySection.tuition)
-            _buildTuitionContent(theme),
-          if (widget.section == UtilitySection.program)
-            _buildEducationProgramContent(theme, userProvider),
+            if (widget.section == UtilitySection.marks)
+              _buildMarksContent(theme),
+            if (widget.section == UtilitySection.behavior)
+              _buildBehaviorMarksContent(theme),
+            if (widget.section == UtilitySection.tuition)
+              _buildTuitionContent(theme),
+            if (widget.section == UtilitySection.program)
+              _buildEducationProgramContent(theme, userProvider),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
-        ],
+            SliverToBoxAdapter(
+              child: SizedBox(height: FloatingNavBar.bottomInset(context)),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  /// Đang tải mục hiện tại - dùng để làm mờ nút tải lại.
+  bool get _isLoading {
+    switch (widget.section) {
+      case UtilitySection.marks:
+        return _isLoadingMarks;
+      case UtilitySection.behavior:
+        return _isLoadingBehavior;
+      case UtilitySection.tuition:
+        return _isLoadingTuition;
+      case UtilitySection.program:
+        return false;
+    }
   }
 
   Widget _buildMarksContent(ThemeData theme) {
@@ -350,7 +311,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
       delegate: SliverChildListDelegate([
         // Overall GPA Card
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 20),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -541,7 +502,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
 
   Widget _buildSectionLabel(String label, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
       child: TrText(
         label,
         style: TextStyle(
@@ -558,7 +519,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
     final settled = tuition.totalOutstanding <= 0;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -606,7 +567,6 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
             'Tổng phải nộp',
             tuition.totalReceivable,
             theme,
-            icon: Icons.attach_money,
           ),
           const Divider(height: 24),
           _buildTuitionRow(
@@ -630,7 +590,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
     );
   }
 
-  /// One fee line or one receipt.
+  /// One fee line or one receipt. Chạm vào để mở popup chi tiết.
   Widget _buildTuitionEntryCard(TuitionEntry entry, ThemeData theme) {
     final settled = !entry.isPayment && entry.outstanding <= 0;
     final accent = entry.isPayment
@@ -638,79 +598,97 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
         : (settled ? Colors.green : Colors.orange);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              entry.isPayment ? Icons.receipt_long : Icons.school,
-              size: 20,
-              color: accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.semesterName.isEmpty
-                      ? context.tr('Không rõ học kỳ')
-                      : entry.semesterName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5,
-                  ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => showDetailSheet(
+          context,
+          child: TuitionDetailSheet(entry: entry),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                if ((entry.note ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    entry.note!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurfaceVariant,
+                child: Icon(
+                  entry.isPayment ? Icons.receipt_long : Icons.school,
+                  size: 20,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.semesterName.isEmpty
+                          ? context.tr('Không rõ học kỳ')
+                          : entry.semesterName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                      ),
                     ),
-                  ),
-                ],
-                if (!entry.isPayment && entry.outstanding > 0) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '${context.tr('Còn lại')}: '
-                    '${_formatCurrency(entry.outstanding)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.orange,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                    if ((entry.note ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        entry.note!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    if (!entry.isPayment && entry.outstanding > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${context.tr('Còn lại')}: '
+                        '${_formatCurrency(entry.outstanding)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                _formatCurrency(entry.amount),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14.5,
+                  color: accent,
+                ),
+              ),
+              // Dấu nhắc là thẻ bấm được.
+              Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Icon(
+                  Symbols.chevron_right_rounded,
+                  size: 20,
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Text(
-            _formatCurrency(entry.amount),
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 14.5,
-              color: accent,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -781,7 +759,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
     final electives = subjects.where((s) => !s.isRequired).length;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
@@ -850,7 +828,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
             });
           },
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerLow,
@@ -940,7 +918,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
 
   Widget _buildProgramSubjectRow(ProgramSubject subject, ThemeData theme) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(28, 3, 16, 3),
+      margin: const EdgeInsets.fromLTRB(32, 3, 20, 3),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -1074,7 +1052,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerLow,
@@ -1129,7 +1107,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
 
   Widget _buildMarkCard(StudentSubjectMark mark, ThemeData theme) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -1218,7 +1196,7 @@ class _UtilitySectionScreenState extends State<UtilitySectionScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,

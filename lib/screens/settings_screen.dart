@@ -17,6 +17,8 @@ import 'package:tlustudy_planner/widgets/app_snackbar.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:tlustudy_planner/i18n/locale_provider.dart';
 import 'package:tlustudy_planner/widgets/calendar_widgets.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
+import 'package:tlustudy_planner/widgets/student_barcode.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -29,7 +31,8 @@ class SettingsScreen extends StatelessWidget {
       slivers: [
         // Modern gradient header
         SliverAppBar(
-          expandedHeight: 200,
+          // Cao hơn bản cũ để chứa mã vạch mã số sinh viên.
+          expandedHeight: 296,
           pinned: true,
           backgroundColor: colorScheme.primary,
           flexibleSpace: FlexibleSpaceBar(
@@ -41,9 +44,17 @@ class SettingsScreen extends StatelessWidget {
                   colors: [colorScheme.primary, colorScheme.secondary],
                 ),
               ),
-              child: SafeArea(
-                child: Consumer<UserProvider>(
-                  builder: (context, userProvider, _) {
+              // Khi cuộn lên, thanh co lại nhưng khối bên trong vẫn dựng ở
+              // chiều cao đầy đủ rồi bị cắt bớt - không thì Column sẽ báo tràn
+              // giữa chừng lúc thu.
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.topCenter,
+                  minHeight: 296,
+                  maxHeight: 296,
+                  child: SafeArea(
+                    child: Consumer<UserProvider>(
+                      builder: (context, userProvider, _) {
                     if (!userProvider.isLoggedIn) {
                       return Center(
                         child: Column(
@@ -103,19 +114,31 @@ class SettingsScreen extends StatelessWidget {
                                 ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 12),
+                          // Mã vạch mã số sinh viên: quét thẳng từ điện thoại
+                          // ở thư viện, phòng thi, quầy một cửa - khỏi phải
+                          // mang theo thẻ cứng.
+                          if (user.studentId.isNotEmpty)
+                            SizedBox(
+                              width: 246,
+                              child: StudentBarcode(data: user.studentId),
+                            ),
+                          const SizedBox(height: 10),
                           TrText(
                             user.studentId,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: colorScheme.onPrimary.withOpacity(0.9),
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.4,
                                 ),
                           ),
                         ],
                       ),
                     );
-                  },
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -200,8 +223,13 @@ class SettingsScreen extends StatelessWidget {
                         AppButton(
                           label: 'Đăng xuất',
                           variant: AppButtonVariant.secondary,
-                          onPressed: () {
-                            userProvider.logout();
+                          onPressed: () async {
+                            // Chờ đăng xuất xong rồi mới báo: việc xóa token,
+                            // keystore và toàn bộ cache đều là bất đồng bộ, báo
+                            // sớm thì lần đăng nhập ngay sau đó có thể chạy đè
+                            // lên phần dọn dẹp còn dở.
+                            await userProvider.logout();
+                            if (!context.mounted) return;
                             showAppSnackBar(
                               context,
                               'Đã đăng xuất',
@@ -256,7 +284,7 @@ class SettingsScreen extends StatelessWidget {
                           label: 'Đăng nhập',
                           variant: AppButtonVariant.primary,
                           onPressed: () {
-                            Navigator.of(context).push(
+                            Navigator.of(context, rootNavigator: true).push(
                               MaterialPageRoute(
                                 builder: (context) => const LoginScreen(),
                               ),
@@ -417,6 +445,7 @@ class SettingsScreen extends StatelessWidget {
                             // Show loading dialog
                             showDialog(
                               context: context,
+                              useRootNavigator: true,
                               barrierDismissible: false,
                               builder: (context) => WillPopScope(
                                 onWillPop: () async => false,
@@ -891,7 +920,9 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        SliverToBoxAdapter(
+          child: SizedBox(height: FloatingNavBar.bottomInset(context)),
+        ),
       ],
     );
   }

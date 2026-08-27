@@ -208,6 +208,14 @@ class UserProvider extends ChangeNotifier {
     return semesters;
   }
 
+  /// True khi ít nhất một học kỳ còn giữ được đợt đăng ký.
+  ///
+  /// Đợt đăng ký chỉ về cùng `GET /api/schoolyear`, nên một phiên khởi động từ
+  /// cache cũ (trước bản vá lưu `periodsJson`) sẽ không có đợt nào và màn hình
+  /// "Đăng ký môn học" đứng im - đây là dấu hiệu để nạp lại.
+  bool get hasRegisterPeriods =>
+      allSemesters.any((s) => s.semesterRegisterPeriods.isNotEmpty);
+
   // ===========================================================================
   // Wiring
   // ===========================================================================
@@ -557,6 +565,49 @@ class UserProvider extends ChangeNotifier {
     return semesters.first;
   }
 
+  /// Re-downloads the school year tree and re-persists it.
+  ///
+  /// Split out of [_syncAllData] because the registration periods ride along
+  /// with this one call: a screen that needs them can top them up on its own
+  /// instead of making the student run a full "Cập nhật dữ liệu".
+  ///
+  /// Returns true when the tree came back with content.
+  Future<bool> refreshSchoolYears() async {
+    final token = await ensureValidToken();
+    if (token == null) return false;
+
+    try {
+      final years = await _authService.getSchoolYears(token);
+      if (years.content.isEmpty) return false;
+
+      _schoolYears = years;
+      await _db.saveSchoolYears(years.content);
+
+      // Kỳ đang chọn được dựng lại từ cây mới để nó mang theo đợt đăng ký, chứ
+      // không còn là đối tượng cũ lấy từ cache.
+      final selectedId = _selectedSemester?.id;
+      if (selectedId != null) {
+        _selectedSemester = _pickSemester(preferredId: selectedId);
+      }
+
+      // Chỉ ghi lại bảng semesters khi đã biết kỳ hiện hành: [_persistSemesters]
+      // đánh dấu `isCurrent` theo kỳ đang chọn, và worker thông báo hằng ngày
+      // đọc thẳng cờ đó từ SQLite.
+      if (_selectedSemester != null) {
+        await _persistSemesters();
+      }
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _log.log(
+        'Không nạp lại được danh sách học kỳ: $e',
+        level: LogLevel.warning,
+      );
+      return false;
+    }
+  }
+
   Future<void> _refreshInBackground() async {
     final token = _accessToken;
     if (token == null) return;
@@ -570,6 +621,12 @@ class UserProvider extends ChangeNotifier {
         );
         await logout();
         return;
+      }
+
+      // Cache của bản cũ không giữ đợt đăng ký; nạp lại cây năm học một lần để
+      // "Đăng ký môn học" dùng được ngay mà không cần đồng bộ toàn bộ.
+      if (!hasRegisterPeriods) {
+        await refreshSchoolYears();
       }
 
       // Silent top-up of the timetable so a returning user sees fresh data.
@@ -759,8 +816,9 @@ class UserProvider extends ChangeNotifier {
     _accessToken = null;
     _refreshToken = null;
     // The keystore copy has to go with the session, or "sign out" would not
-    // actually sign the student out.
-    unawaited(CredentialStore.instance.clear());
+    // actually sign the student out. Awaited: if the app dies before the wipe
+    // lands, the saved credentials would silently log the student back in.
+    await CredentialStore.instance.clear();
     _tokenExpiryMs = null;
 
     await _prefs?.remove(_kAccessToken);

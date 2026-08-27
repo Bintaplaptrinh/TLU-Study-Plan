@@ -6,9 +6,13 @@ import 'package:provider/provider.dart';
 
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/theme/app_colors.dart';
+import 'package:tlustudy_planner/utils/shell_scope.dart';
 import 'package:tlustudy_planner/utils/schedule_time.dart';
 import 'package:tlustudy_planner/widgets/class_card.dart';
+import 'package:tlustudy_planner/widgets/class_detail_sheet.dart';
+import 'package:tlustudy_planner/widgets/detail_sheet.dart';
 import 'package:tlustudy_planner/widgets/empty_state_widget.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 import 'package:tlustudy_planner/widgets/weather_card.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
 
@@ -131,16 +135,30 @@ class _TodayScreenState extends State<TodayScreen> {
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (context, i) {
                           final slot = classes[i];
+                          final state = slot.stateAt(_now);
                           return ClassCard(
                             course: slot.course,
                             startLabel: slot.startLabel,
                             endLabel: slot.endLabel,
-                            state: slot.stateAt(_now),
+                            state: state,
+                            onTap: () => showDetailSheet(
+                              context,
+                              child: ClassDetailSheet(
+                                course: slot.course,
+                                startLabel: slot.startLabel,
+                                endLabel: slot.endLabel,
+                                state: state,
+                              ),
+                            ),
                           );
                         },
                       ),
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: FloatingNavBar.bottomInset(context),
+                    ),
+                  ),
                 ],
               ),
             );
@@ -338,6 +356,10 @@ class _StatTile extends StatelessWidget {
   }
 }
 
+/// Vòng tròn chữ cái đầu ở góc phải tiêu đề Trang chủ.
+///
+/// Chạm vào là sang thẳng Cài đặt: đó là chỗ duy nhất còn lại có hồ sơ, mã số
+/// sinh viên và nút đăng xuất, mà avatar thì ai cũng thử bấm.
 class _AvatarBadge extends StatelessWidget {
   const _AvatarBadge({required this.name});
 
@@ -353,24 +375,46 @@ class _AvatarBadge extends StatelessWidget {
             ? parts.first.substring(0, 1)
             : '${parts[parts.length - 2][0]}${parts.last[0]}');
 
-    return Container(
-      width: 48,
-      height: 48,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppColors.accentGradient(context),
-        ),
-        shape: BoxShape.circle,
-      ),
-      child: TrText(
-        initials.toUpperCase(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: 15,
+    final shell = ShellScope.maybeOf(context);
+
+    return Semantics(
+      button: shell != null,
+      label: context.tr('Cài đặt'),
+      child: Tooltip(
+        message: context.tr('Cài đặt'),
+        waitDuration: const Duration(milliseconds: 600),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: Ink(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: AppColors.accentGradient(context),
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: InkWell(
+              onTap: shell == null
+                  ? null
+                  : () => shell.goToTab(ShellScope.settingsTab),
+              customBorder: const CircleBorder(),
+              child: Center(
+                child: TrText(
+                  initials.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

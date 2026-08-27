@@ -7,7 +7,10 @@ import 'package:tlustudy_planner/screens/choose_date_screen.dart';
 import 'package:tlustudy_planner/theme/app_colors.dart';
 import 'package:tlustudy_planner/utils/schedule_time.dart';
 import 'package:tlustudy_planner/widgets/calendar_widgets.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 import 'package:tlustudy_planner/widgets/class_card.dart';
+import 'package:tlustudy_planner/widgets/class_detail_sheet.dart';
+import 'package:tlustudy_planner/widgets/detail_sheet.dart';
 import 'package:tlustudy_planner/widgets/empty_state_widget.dart';
 import 'package:tlustudy_planner/widgets/styled_dropdown.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
@@ -285,20 +288,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
                 final slot = slots[i];
+                final state = isToday
+                    ? slot.stateAt(now)
+                    : ClassState.upcoming;
                 return ClassCard(
                   course: slot.course,
                   startLabel: slot.startLabel,
                   endLabel: slot.endLabel,
-                  state: isToday ? slot.stateAt(now) : ClassState.upcoming,
+                  state: state,
+                  onTap: () => showDetailSheet(
+                    context,
+                    child: ClassDetailSheet(
+                      course: slot.course,
+                      startLabel: slot.startLabel,
+                      endLabel: slot.endLabel,
+                      state: state,
+                    ),
+                  ),
                 );
               },
             ),
           ),
         // Clears the bottom navigation bar and stretches the sheet's
         // background to the bottom edge when the list is short.
-        const SliverFillRemaining(
+        SliverFillRemaining(
           hasScrollBody: false,
-          child: SizedBox(height: 28),
+          child: SizedBox(height: FloatingNavBar.bottomInset(context)),
         ),
       ]),
     ];

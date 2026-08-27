@@ -80,6 +80,7 @@ class _LogsScreenState extends State<LogsScreen> {
             onPressed: () {
               showDialog(
                 context: context,
+                useRootNavigator: true,
                 builder: (context) => AlertDialog(
                   title: const TrText('Clear logs?'),
                   content: const TrText('This will delete all log entries.'),

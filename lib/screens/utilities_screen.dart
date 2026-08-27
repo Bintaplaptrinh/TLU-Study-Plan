@@ -5,8 +5,10 @@ import 'package:tlustudy_planner/i18n/tr_text.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/screens/enrollment_screen.dart';
 import 'package:tlustudy_planner/screens/utility_section_screen.dart';
-import 'package:tlustudy_planner/theme/app_theme.dart';
+import 'package:tlustudy_planner/theme/app_colors.dart';
 import 'package:tlustudy_planner/utils/page_transitions.dart';
+import 'package:tlustudy_planner/widgets/page_header.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 
 /// Trang chủ của "Tiện ích": một lưới thẻ, mỗi thẻ mở một trang riêng.
 ///
@@ -60,115 +62,59 @@ class UtilitiesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final userProvider = context.watch<UserProvider>();
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            automaticallyImplyLeading: false,
-            flexibleSpace: FlexibleSpaceBar(
-              title: const TrText(
-                'Tiện ích',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-                  ),
-                ),
+      backgroundColor: AppColors.bg(context),
+      body: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            // Cùng một kiểu tiêu đề với Trang chủ và Lịch học: chữ lớn nằm
+            // thẳng trên nền trang thay vì dải gradient của bản cũ.
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: 'Tiện ích',
+                subtitle: 'Chọn một tiện ích để xem chi tiết',
+                // trailing: HeaderAvatar(
+                //   name: userProvider.tluUser?.displayName ?? 'Sinh viên',
+                // ),
               ),
             ),
-          ),
 
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(14),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  // Hai cột trên điện thoại, ba cột khi máy đủ rộng (tablet,
+                  // xoay ngang) - thẻ giữ nguyên tỉ lệ thay vì kéo dài ra.
+                  final width = constraints.crossAxisExtent;
+                  final columns = width >= 600 ? 3 : 2;
+
+                  return SliverGrid(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 14,
+                      childAspectRatio: 0.95,
                     ),
-                    child: const Icon(
-                      Icons.person,
-                      color: AppTheme.primaryColor,
-                      size: 24,
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _UtilityCard(entry: _entries[index]),
+                      childCount: _entries.length,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TrText(
-                          userProvider.tluUser?.displayName ?? 'Sinh viên',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        TrText(
-                          'Chọn một tiện ích để xem chi tiết',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
-          ),
 
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverLayoutBuilder(
-              builder: (context, constraints) {
-                // Hai cột trên điện thoại, ba cột khi máy đủ rộng (tablet, xoay
-                // ngang) - thẻ giữ nguyên tỉ lệ thay vì kéo dài ra.
-                final width = constraints.crossAxisExtent;
-                final columns = width >= 600 ? 3 : 2;
-
-                return SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                    childAspectRatio: 0.95,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => _UtilityCard(entry: _entries[index]),
-                    childCount: _entries.length,
-                  ),
-                );
-              },
+            SliverToBoxAdapter(
+              child: SizedBox(height: FloatingNavBar.bottomInset(context)),
             ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -239,12 +185,12 @@ class _UtilityCardState extends State<_UtilityCard> {
         curve: Curves.easeOut,
         child: Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLow,
+            color: AppColors.surface(context),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: entry.highlight
                   ? entry.color.withOpacity(0.55)
-                  : theme.colorScheme.outlineVariant,
+                  : AppColors.border(context),
               width: entry.highlight ? 1.6 : 1,
             ),
             boxShadow: [

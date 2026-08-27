@@ -5,6 +5,7 @@ import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/models/api_response.dart';
 import 'package:tlustudy_planner/widgets/styled_dropdown.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 
 class ExamScheduleScreen extends StatefulWidget {
   const ExamScheduleScreen({super.key});
@@ -348,6 +349,11 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
         ),
         // Exam room details
         _buildExamRoomDetails(context, userProvider, examProvider),
+
+        // Chừa chỗ cho thanh điều hướng nổi.
+        SliverToBoxAdapter(
+          child: SizedBox(height: FloatingNavBar.bottomInset(context)),
+        ),
       ],
     );
   }

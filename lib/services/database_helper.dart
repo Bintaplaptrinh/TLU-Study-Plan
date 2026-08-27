@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 6, // Version 6: cache marks, behaviour scores and tuition
+      version: 7, // Version 7: cache semester registration periods
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -179,6 +179,17 @@ class DatabaseHelper {
       await db.execute(_createBehaviorTable);
       await db.execute(_createTuitionTable);
     }
+
+    if (oldVersion < 7) {
+      // Đợt đăng ký (semesterRegisterPeriods) trước đây bị bỏ khi lưu, nên sau
+      // lần khởi động thứ hai màn hình "Đăng ký môn học" không còn đợt nào để
+      // chọn. Giữ luôn cả ordinalNumbers để thứ tự học kỳ không phải đoán theo
+      // id.
+      await db.execute(
+        'ALTER TABLE semesters ADD COLUMN ordinalNumbers INTEGER',
+      );
+      await db.execute('ALTER TABLE semesters ADD COLUMN periodsJson TEXT');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -217,6 +228,8 @@ class DatabaseHelper {
         startDate INTEGER NOT NULL,
         endDate INTEGER NOT NULL,
         isCurrent INTEGER NOT NULL,
+        ordinalNumbers INTEGER,
+        periodsJson TEXT,
         lastUpdated INTEGER NOT NULL
       )
     ''');
@@ -500,6 +513,8 @@ class DatabaseHelper {
         'startDate': semester.startDate,
         'endDate': semester.endDate,
         'isCurrent': semester.isCurrent ? 1 : 0,
+        'ordinalNumbers': semester.ordinalNumbers,
+        'periodsJson': encodeRegisterPeriods(semester.semesterRegisterPeriods),
         'lastUpdated': now,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -512,19 +527,58 @@ class DatabaseHelper {
     final db = await database;
     final maps = await db.query('semesters', orderBy: 'startDate DESC');
 
-    return maps
-        .map(
-          (map) => Semester(
-            id: map['id'] as int,
-            semesterCode: map['semesterCode'] as String,
-            semesterName: map['semesterName'] as String,
-            startDate: map['startDate'] as int,
-            endDate: map['endDate'] as int,
-            isCurrent: (map['isCurrent'] as int) == 1,
-            semesterRegisterPeriods: [],
-          ),
-        )
-        .toList();
+    return maps.map(_semesterFromRow).toList();
+  }
+
+  /// Dựng lại một [Semester] từ một dòng của bảng `semesters`.
+  ///
+  /// Đợt đăng ký nằm trong `periodsJson` chứ không có bảng riêng: chúng luôn đi
+  /// kèm cây năm học, số lượng nhỏ, và không có truy vấn nào cần lọc theo đợt.
+  Semester _semesterFromRow(Map<String, Object?> map) {
+    return Semester(
+      id: map['id'] as int,
+      semesterCode: map['semesterCode'] as String,
+      semesterName: map['semesterName'] as String,
+      startDate: map['startDate'] as int,
+      endDate: map['endDate'] as int,
+      isCurrent: (map['isCurrent'] as int) == 1,
+      ordinalNumbers: map['ordinalNumbers'] as int?,
+      semesterRegisterPeriods: decodeRegisterPeriods(
+        map['periodsJson'] as String?,
+      ),
+    );
+  }
+
+  /// `null` khi không có đợt nào, để dòng cũ và dòng rỗng đọc ra như nhau.
+  static String? encodeRegisterPeriods(List<SemesterRegisterPeriod> periods) {
+    if (periods.isEmpty) return null;
+    return jsonEncode(
+      periods
+          .map(
+            (p) => {
+              'id': p.id,
+              'name': p.name,
+              'displayOrder': p.displayOrder,
+            },
+          )
+          .toList(),
+    );
+  }
+
+  /// Bản ghi hỏng chỉ làm mất đợt đăng ký của một kỳ, không được làm hỏng cả
+  /// lần đọc cache - nên nuốt lỗi và trả danh sách rỗng.
+  static List<SemesterRegisterPeriod> decodeRegisterPeriods(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(SemesterRegisterPeriod.fromJson)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
   }
 
   // Save student courses
@@ -885,16 +939,7 @@ class DatabaseHelper {
 
     Semester semester;
     if (semesterMaps.isNotEmpty) {
-      final semMap = semesterMaps.first;
-      semester = Semester(
-        id: semMap['id'] as int,
-        semesterCode: semMap['semesterCode'] as String,
-        semesterName: semMap['semesterName'] as String,
-        startDate: semMap['startDate'] as int,
-        endDate: semMap['endDate'] as int,
-        isCurrent: (semMap['isCurrent'] as int) == 1,
-        semesterRegisterPeriods: [],
-      );
+      semester = _semesterFromRow(semesterMaps.first);
     } else {
       // Fallback semester if not found
       semester = Semester(

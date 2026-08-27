@@ -118,6 +118,18 @@ class EnrollmentProvider extends ChangeNotifier {
   Future<void> initialize() async {
     if (_isLoading) return;
 
+    // Cây năm học có thể đến từ cache, mà cache của bản cũ không giữ đợt đăng
+    // ký - xin cổng một bản mới trước khi kết luận là "không có đợt nào".
+    var toppedUp = false;
+    if (schoolYears.isEmpty || !_userProvider.hasRegisterPeriods) {
+      // Bật cờ chờ quanh đúng lời gọi mạng này thôi: các nhánh phía dưới vẫn
+      // giả định `_isLoading == false` như trước.
+      _isLoading = true;
+      notifyListeners();
+      toppedUp = await _userProvider.refreshSchoolYears();
+      _isLoading = false;
+    }
+
     final years = schoolYears;
     if (years.isEmpty) {
       _error = 'Chưa có dữ liệu năm học. Hãy tải lại dữ liệu ở màn hình chính.';
@@ -149,6 +161,26 @@ class EnrollmentProvider extends ChangeNotifier {
     _selectedYearId = year.id;
     _selectedSemesterId = semester?.id;
     _selectedPeriodId = _pickDefaultPeriod(semester);
+
+    // Không có đợt nào mà cũng chưa hỏi lại cổng lần nào: hỏi một lần rồi chọn
+    // lại, thay vì để màn hình đứng ở "Học kỳ này chưa có đợt đăng ký nào" cho
+    // tới lần đồng bộ đầy đủ tiếp theo.
+    if (_selectedPeriodId == null && !toppedUp) {
+      _isLoading = true;
+      notifyListeners();
+      final ok = await _userProvider.refreshSchoolYears();
+      _isLoading = false;
+
+      if (ok) {
+        final refreshedYear = _currentYear;
+        if (refreshedYear != null) {
+          _selectedYearId = refreshedYear.id;
+          final refreshedSemester = _currentSemester;
+          _selectedSemesterId = refreshedSemester?.id;
+          _selectedPeriodId = _pickDefaultPeriod(refreshedSemester);
+        }
+      }
+    }
 
     await refresh();
   }

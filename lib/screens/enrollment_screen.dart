@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
 import 'package:tlustudy_planner/i18n/tr_text.dart';
 import 'package:tlustudy_planner/models/api_response.dart';
 import 'package:tlustudy_planner/models/enrollment.dart';
 import 'package:tlustudy_planner/providers/enrollment_provider.dart';
+import 'package:tlustudy_planner/theme/app_colors.dart';
 import 'package:tlustudy_planner/theme/app_theme.dart';
 import 'package:tlustudy_planner/widgets/app_snackbar.dart';
+import 'package:tlustudy_planner/widgets/page_header.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 import 'package:tlustudy_planner/widgets/styled_dropdown.dart';
 
 /// Màn hình "Đăng ký môn học".
@@ -41,59 +45,52 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     final provider = context.watch<EnrollmentProvider>();
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            // Nút back mặc định của Flutter đã đúng hành vi, chỉ cần tô trắng
-            // cho nổi trên nền gradient.
-            iconTheme: const IconThemeData(color: Colors.white),
-            flexibleSpace: FlexibleSpaceBar(
-              title: const TrText(
-                'Đăng ký môn học',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+      backgroundColor: AppColors.bg(context),
+      body: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            // Tiêu đề lớn canh trái thẳng với các thẻ bên dưới, nút tải lại
+            // ở mép phải. Nút back nằm dưới đáy, là thanh điều hướng đã thu
+            // lại thành hình tròn.
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: 'Đăng ký môn học',
+                subtitle: 'Đăng ký, hủy lớp học phần theo đợt',
+                actions: [
+                  HeaderIconButton(
+                    icon: Symbols.refresh_rounded,
+                    tooltip: 'Tải lại',
+                    onTap: provider.isLoading ? null : provider.refresh,
                   ),
-                ),
+                ],
               ),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.white),
-                onPressed: provider.isLoading ? null : provider.refresh,
-                tooltip: 'Tải lại',
-              ),
-            ],
-          ),
 
-          SliverToBoxAdapter(child: _buildSelectors(theme, provider)),
-          SliverToBoxAdapter(child: _buildStatusBanner(theme, provider)),
+            SliverToBoxAdapter(child: _buildSelectors(theme, provider)),
+            SliverToBoxAdapter(child: _buildStatusBanner(theme, provider)),
 
-          if (provider.isLoading)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (provider.view.subjects.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _buildEmptyState(theme, provider),
-            )
-          else
-            _buildSubjectList(theme, provider),
+            if (provider.isLoading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (provider.view.subjects.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildEmptyState(theme, provider),
+              )
+            else
+              _buildSubjectList(theme, provider),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
-        ],
+            SliverToBoxAdapter(
+              child: SizedBox(height: FloatingNavBar.bottomInset(context)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -110,7 +107,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     if (years.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
@@ -222,7 +219,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     final color = open ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
@@ -298,7 +295,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     final registered = subject.isRegistered;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
@@ -658,6 +655,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   Future<bool> _confirmUnregister(CourseClass courseClass) async {
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -685,6 +683,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   Future<bool> _confirmOverlap(CourseClass courseClass) async {
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
