@@ -7,9 +7,11 @@ import 'package:tlustudy_planner/screens/settings_screen.dart';
 import 'package:tlustudy_planner/screens/today_screen.dart';
 import 'package:tlustudy_planner/screens/utilities_screen.dart';
 import 'package:tlustudy_planner/theme/app_colors.dart';
+import 'package:tlustudy_planner/utils/page_transitions.dart';
 import 'package:tlustudy_planner/utils/shell_scope.dart';
 import 'package:tlustudy_planner/widgets/cache_progress_banner.dart';
 import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
+import 'package:tlustudy_planner/widgets/tab_slide_switcher.dart';
 
 /// Khung chính của ứng dụng: năm tab, và một thanh điều hướng nổi bên trên.
 ///
@@ -31,6 +33,9 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
   /// nằm trong Navigator lồng - `setState` của khung không dựng lại nó, phải
   /// có thứ để nó tự nghe.
   final ValueNotifier<int> _tabIndex = ValueNotifier<int>(0);
+
+  /// Hướng của cú trượt đổi tab: 1 là sang phải, -1 là về bên trái.
+  int _tabDirection = 1;
 
   /// Số trang con đang chồng lên trang gốc.
   final ValueNotifier<int> _subPageDepth = ValueNotifier<int>(0);
@@ -73,6 +78,10 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
     // Đang ở trang con mà bấm tab thì quay hẳn về trang gốc trước, nếu không
     // tab mới sẽ nằm khuất bên dưới trang con.
     _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    if (index == _tabIndex.value) return;
+
+    // Tab đích nằm bên phải hay bên trái tab hiện tại - đó là hướng trượt.
+    _tabDirection = index > _tabIndex.value ? 1 : -1;
     _tabIndex.value = index;
   }
 
@@ -108,40 +117,27 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
                             settings: settings,
                             transitionDuration: Duration.zero,
                             reverseTransitionDuration: Duration.zero,
+                            // Trang gốc không có chuyển cảnh của riêng nó,
+                            // nhưng vẫn phải lùi sang trái khi bị một trang con
+                            // trượt lên phủ.
+                            transitionsBuilder:
+                                (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                ) => buildCoveredSlide(
+                                  secondaryAnimation,
+                                  child,
+                                ),
                             pageBuilder: (_, _, _) =>
                                 ValueListenableBuilder<int>(
                                   valueListenable: _tabIndex,
                                   builder: (context, index, _) =>
-                                      AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 300,
-                                        ),
-                                        switchInCurve: Curves.easeInOut,
-                                        switchOutCurve: Curves.easeInOut,
-                                        transitionBuilder: (child, animation) =>
-                                            FadeTransition(
-                                              opacity: animation,
-                                              child: SlideTransition(
-                                                position:
-                                                    Tween<Offset>(
-                                                      begin: const Offset(
-                                                        0.12,
-                                                        0,
-                                                      ),
-                                                      end: Offset.zero,
-                                                    ).animate(
-                                                      CurvedAnimation(
-                                                        parent: animation,
-                                                        curve: Curves.easeInOut,
-                                                      ),
-                                                    ),
-                                                child: child,
-                                              ),
-                                            ),
-                                        child: KeyedSubtree(
-                                          key: ValueKey<int>(index),
-                                          child: _screenFor(index),
-                                        ),
+                                      TabSlideSwitcher(
+                                        index: index,
+                                        direction: _tabDirection,
+                                        child: _screenFor(index),
                                       ),
                                 ),
                           ),

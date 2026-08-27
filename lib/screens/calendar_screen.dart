@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/screens/choose_date_screen.dart';
 import 'package:tlustudy_planner/theme/app_colors.dart';
+import 'package:tlustudy_planner/utils/page_transitions.dart';
 import 'package:tlustudy_planner/utils/schedule_time.dart';
 import 'package:tlustudy_planner/widgets/calendar_widgets.dart';
 import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
@@ -113,11 +114,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 icon: Symbols.edit_calendar_rounded,
                 tooltip: 'Chọn ngày',
                 onTap: () async {
-                  final picked = await Navigator.of(context).push<DateTime>(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ChooseDateScreen(initialDate: _selectedDate),
-                    ),
+                  final picked = await pushSlide<DateTime>(
+                    context,
+                    ChooseDateScreen(initialDate: _selectedDate),
                   );
                   if (picked != null && mounted) {
                     setState(() => _select(picked));

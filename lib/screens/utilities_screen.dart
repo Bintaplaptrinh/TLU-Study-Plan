@@ -159,7 +159,7 @@ class _UtilityCardState extends State<_UtilityCard> {
 
   void _open() {
     final section = widget.entry.section;
-    pushSlideUp(
+    pushSlide(
       context,
       section == null
           ? const EnrollmentScreen()

@@ -10,7 +10,9 @@ import 'package:tlustudy_planner/widgets/class_card.dart';
 import 'package:tlustudy_planner/widgets/class_detail_sheet.dart';
 import 'package:tlustudy_planner/widgets/detail_sheet.dart';
 import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
+import 'package:tlustudy_planner/utils/page_transitions.dart';
 import 'package:tlustudy_planner/widgets/student_barcode.dart';
+import 'package:tlustudy_planner/widgets/tab_slide_switcher.dart';
 import 'package:tlustudy_planner/widgets/tuition_detail_sheet.dart';
 
 /// Kiểm tra các mảnh giao diện mới dựng được ở cả hai chế độ sáng/tối và trên
@@ -184,6 +186,177 @@ void main() {
     }
     await tester.pumpAndSettle();
     expect(find.byIcon(Symbols.arrow_back_rounded), findsOneWidget);
+  });
+
+  testWidgets('đổi tab trượt đúng hướng của tab đích', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    var index = 0;
+    var direction = 1;
+    late StateSetter setPage;
+
+    Widget page(int i) => SizedBox.expand(
+      child: Align(alignment: Alignment.topLeft, child: Text('Trang $i')),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              setPage = setState;
+              return TabSlideSwitcher(
+                index: index,
+                direction: direction,
+                child: page(index),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    expect(tester.getTopLeft(find.text('Trang 0')).dx, 0);
+
+    // Sang tab bên phải: trang mới vào từ mép phải, trang cũ ra ở mép trái.
+    setPage(() {
+      index = 2;
+      direction = 1;
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.getTopLeft(find.text('Trang 2')).dx, greaterThan(0));
+    expect(tester.getTopLeft(find.text('Trang 0')).dx, lessThan(0));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('Trang 2')).dx, 0);
+
+    // Lùi về tab bên trái: đúng chiều ngược lại.
+    setPage(() {
+      index = 1;
+      direction = -1;
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.getTopLeft(find.text('Trang 1')).dx, lessThan(0));
+    expect(tester.getTopLeft(find.text('Trang 2')).dx, greaterThan(0));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mở trang con thì trượt vào từ mép phải', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // Dựng đúng hình dạng khung chính: trang gốc nằm trong Navigator lồng và
+    // tự khai báo cú lùi khi bị phủ.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Navigator(
+            onGenerateRoute: (settings) => PageRouteBuilder(
+              settings: settings,
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+              transitionsBuilder: (context, animation, secondary, child) =>
+                  buildCoveredSlide(secondary, child),
+              pageBuilder: (_, _, _) => Builder(
+                builder: (context) => SizedBox.expand(
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: GestureDetector(
+                      onTap: () => pushSlide(
+                        context,
+                        const Scaffold(
+                          body: SizedBox.expand(
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: Text('Trang con'),
+                            ),
+                          ),
+                        ),
+                      ),
+                      child: const Text('Mở'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.getTopLeft(find.text('Mở')).dx, 0);
+
+    await tester.tap(find.text('Mở'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    // Trang mới vào từ mép phải, trang cũ lùi sang trái chứ không đứng yên.
+    expect(tester.getTopLeft(find.text('Trang con')).dx, greaterThan(0));
+    expect(tester.getTopLeft(find.text('Mở')).dx, lessThan(0));
+
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('Trang con')).dx, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hộp thoại chờ đóng đúng Navigator, không làm rỗng khung', (
+    tester,
+  ) async {
+    // Dựng lại đúng hình dạng của khung chính: một Navigator lồng bên trong,
+    // trang nằm trong đó mở một hộp thoại trên Navigator gốc. Đóng nhầm bằng
+    // Navigator lồng là ngăn xếp của khung rỗng và Flutter ném
+    // '_history.isNotEmpty': is not true - đó là lỗi của nút "Cập nhật dữ liệu".
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Navigator(
+            onGenerateRoute: (settings) => MaterialPageRoute(
+              settings: settings,
+              builder: (_) => Builder(
+                builder: (context) => Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final rootNavigator = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      );
+                      showDialog<void>(
+                        context: context,
+                        useRootNavigator: true,
+                        barrierDismissible: false,
+                        builder: (_) => const AlertDialog(
+                          content: Text('Đang cập nhật...'),
+                        ),
+                      );
+                      await Future<void>.delayed(
+                        const Duration(milliseconds: 20),
+                      );
+                      if (rootNavigator.canPop()) rootNavigator.pop();
+                    },
+                    child: const Text('Cập nhật ngay'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Cập nhật ngay'));
+    await tester.pump();
+    expect(find.text('Đang cập nhật...'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Đang cập nhật...'), findsNothing);
+    // Trang bên dưới vẫn còn: ngăn xếp của khung không bị pop nhầm.
+    expect(find.text('Cập nhật ngay'), findsOneWidget);
   });
 
   testWidgets('popup chi tiết lớp học hiện đủ thông tin', (tester) async {

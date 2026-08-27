@@ -441,14 +441,35 @@ class SettingsScreen extends StatelessWidget {
                             ? AppButtonVariant.primary
                             : AppButtonVariant.secondary,
                         onPressed: () async {
+                          // Hộp thoại chờ nằm trên Navigator gốc, nên phải
+                          // đóng bằng đúng Navigator gốc. `Navigator.of(context)`
+                          // ở đây lại trỏ vào Navigator lồng của khung tab -
+                          // pop nhầm chỗ đó sẽ làm rỗng ngăn xếp của khung và
+                          // ném '_history.isNotEmpty': is not true.
+                          final rootNavigator = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          var dialogOpen = false;
+
+                          void closeLoadingDialog() {
+                            if (!dialogOpen) return;
+                            dialogOpen = false;
+                            if (rootNavigator.canPop()) rootNavigator.pop();
+                          }
+
                           try {
                             // Show loading dialog
+                            dialogOpen = true;
                             showDialog(
                               context: context,
                               useRootNavigator: true,
                               barrierDismissible: false,
-                              builder: (context) => WillPopScope(
-                                onWillPop: () async => false,
+                              builder: (context) => PopScope(
+                                // Không cho phím back đóng hộp thoại giữa
+                                // chừng: đóng sớm là cờ dialogOpen sai và lần
+                                // đóng sau sẽ pop nhầm một trang thật.
+                                canPop: false,
                                 child: Consumer<UserProvider>(
                                   builder: (context, provider, _) {
                                     return AlertDialog(
@@ -476,8 +497,8 @@ class SettingsScreen extends StatelessWidget {
 
                             await userProvider.reloadAllData();
 
+                            closeLoadingDialog();
                             if (context.mounted) {
-                              Navigator.of(context).pop(); // Close loading dialog
                               showAppSnackBar(
                                 context,
                                 'Đã cập nhật dữ liệu thành công',
@@ -486,8 +507,8 @@ class SettingsScreen extends StatelessWidget {
                               );
                             }
                           } catch (e) {
+                            closeLoadingDialog();
                             if (context.mounted) {
-                              Navigator.of(context).pop(); // Close loading dialog
                               showAppSnackBar(
                                 context,
                                 'Lỗi: ${e.toString()}',
