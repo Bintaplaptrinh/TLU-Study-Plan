@@ -28,11 +28,29 @@ jobs:
       - name: Create necessary files
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/rel.jks
+
+      # env.json bi gitignore nen phai dung lai tu GitHub Secrets. Dung
+      # here-doc quoted ('JSON') de shell khong dien bien vao giua noi dung,
+      # va khong echo file ra log.
+      - name: Create env.json
+        env:
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          TLU_MAIL_CLIENT_ID: ${{ secrets.TLU_MAIL_CLIENT_ID }}
+        run: |
+          python3 - <<'PY' > env.json
+          import json, os
+          json.dump({
+              "OPENWEATHER_API_KEY": os.environ.get("OPENWEATHER_API_KEY", ""),
+              "TLU_MAIL_CLIENT_ID": os.environ.get("TLU_MAIL_CLIENT_ID", ""),
+          }, __import__("sys").stdout)
+          PY
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.7'
+          # Phai >= 3.44: pubspec.lock yeu cau Dart 3.12, va flutter_localizations
+          # tu 3.47 moi ghim intl 0.20.3 dung nhu pubspec khai bao.
+          flutter-version: '3.47.2'
           channel: 'stable'
       
       - name: Get dependencies
@@ -43,18 +61,18 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-        run: flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
+        run: flutter build apk --release --dart-define-from-file=env.json --obfuscate --split-debug-info=build/app/outputs/symbols
 
       - name: Build App Bundle
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-        run: flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
+        run: flutter build appbundle --release --dart-define-from-file=env.json --obfuscate --split-debug-info=build/app/outputs/symbols
 
       - name: Build iOS (No Codesign)
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --dart-define-from-file=env.json
           cd build/ios/iphoneos
           mkdir Payload
           cp -r Runner.app Payload

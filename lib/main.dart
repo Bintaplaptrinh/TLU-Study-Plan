@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:tlustudy_planner/config/app_info.dart';
 import 'package:tlustudy_planner/i18n/locale_provider.dart';
 import 'package:tlustudy_planner/i18n/translation_service.dart';
 import 'package:tlustudy_planner/providers/theme_provider.dart';
@@ -10,16 +11,22 @@ import 'package:tlustudy_planner/providers/enrollment_provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/providers/schedule_provider.dart';
 import 'package:tlustudy_planner/providers/exam_provider.dart';
+import 'package:tlustudy_planner/providers/mail_provider.dart';
 import 'package:tlustudy_planner/services/notification_service.dart';
 import 'package:tlustudy_planner/services/daily_notification_service.dart';
 import 'package:tlustudy_planner/theme/app_theme.dart';
 import 'package:tlustudy_planner/screens/home_shell.dart';
+import 'package:tlustudy_planner/widgets/mail_poller.dart';
 import 'package:tlustudy_planner/utils/error_logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   tz.initializeTimeZones();
+
+  // Nạp số phiên bản từ pubspec một lần, để mọi nơi (Cài đặt, log, User-Agent)
+  // dùng chung một nguồn thay vì chuỗi gõ tay.
+  await AppInfo.load();
 
   final errorLogger = ErrorLogger();
 
@@ -55,6 +62,10 @@ void main() async {
 
   final examProvider = ExamProvider();
 
+  // Hộp thư trường: đọc lại phiên OAuth đã cất trong keystore, nếu có.
+  final mailProvider = MailProvider();
+  await mailProvider.init();
+
   // Link providers so UserProvider can fetch exam data during login
   userProvider.setExamProvider(examProvider);
 
@@ -82,6 +93,7 @@ void main() async {
         ChangeNotifierProvider.value(value: userProvider),
         ChangeNotifierProvider(create: (_) => ScheduleProvider()),
         ChangeNotifierProvider.value(value: examProvider),
+        ChangeNotifierProvider.value(value: mailProvider),
         // Đăng ký học phần dựa vào phiên đăng nhập của UserProvider để
         // lấy token và mã sinh viên, nên nhận thẳng instance đó.
         ChangeNotifierProvider(
@@ -115,7 +127,7 @@ class MyApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const HomeShell(),
+          home: const MailPoller(child: HomeShell()),
           debugShowCheckedModeBanner: false,
         );
       },

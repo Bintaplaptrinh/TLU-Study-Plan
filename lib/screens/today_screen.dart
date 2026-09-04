@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
+import 'package:tlustudy_planner/providers/mail_provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
+import 'package:tlustudy_planner/screens/notice_screen.dart';
 import 'package:tlustudy_planner/theme/app_colors.dart';
-import 'package:tlustudy_planner/utils/shell_scope.dart';
+import 'package:tlustudy_planner/utils/page_transitions.dart';
 import 'package:tlustudy_planner/utils/schedule_time.dart';
 import 'package:tlustudy_planner/widgets/class_card.dart';
 import 'package:tlustudy_planner/widgets/class_detail_sheet.dart';
@@ -219,7 +221,7 @@ class _TodayScreenState extends State<TodayScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          _AvatarBadge(name: name),
+          const _NoticeButton(),
         ],
       ),
     );
@@ -356,67 +358,99 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-/// Vòng tròn chữ cái đầu ở góc phải tiêu đề Trang chủ.
+/// Nút Thông báo ở góc phải tiêu đề Trang chủ.
 ///
-/// Chạm vào là sang thẳng Cài đặt: đó là chỗ duy nhất còn lại có hồ sơ, mã số
-/// sinh viên và nút đăng xuất, mà avatar thì ai cũng thử bấm.
-class _AvatarBadge extends StatelessWidget {
-  const _AvatarBadge({required this.name});
-
-  final String name;
+/// Trước đây chỗ này là vòng tròn chữ cái đầu, bấm vào ra Cài đặt - một lối
+/// tắt ít ai dùng, vì Cài đặt đã có sẵn một tab riêng ngay dưới đáy màn hình.
+/// Thông báo thì không có tab nào, nên nó nhận chỗ đứng này: có việc mới thì
+/// thấy ngay từ Trang chủ.
+class _NoticeButton extends StatelessWidget {
+  const _NoticeButton();
 
   @override
   Widget build(BuildContext context) {
-    final parts =
-        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    final initials = parts.isEmpty
-        ? 'SV'
-        : (parts.length == 1
-            ? parts.first.substring(0, 1)
-            : '${parts[parts.length - 2][0]}${parts.last[0]}');
+    return Consumer<MailProvider>(
+      builder: (context, mail, _) {
+        final unread = mail.isLinked ? mail.unreadCount : 0;
 
-    final shell = ShellScope.maybeOf(context);
-
-    return Semantics(
-      button: shell != null,
-      label: context.tr('Cài đặt'),
-      child: Tooltip(
-        message: context.tr('Cài đặt'),
-        waitDuration: const Duration(milliseconds: 600),
-        child: Material(
-          color: Colors.transparent,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: Ink(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: AppColors.accentGradient(context),
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: InkWell(
-              onTap: shell == null
-                  ? null
-                  : () => shell.goToTab(ShellScope.settingsTab),
-              customBorder: const CircleBorder(),
-              child: Center(
-                child: TrText(
-                  initials.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
+        return Semantics(
+          button: true,
+          label: unread > 0
+              ? '${context.tr('Thông báo')}, $unread ${context.tr('thư chưa đọc')}'
+              : context.tr('Thông báo'),
+          child: Tooltip(
+            message: context.tr('Thông báo'),
+            waitDuration: const Duration(milliseconds: 600),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    clipBehavior: Clip.antiAlias,
+                    child: Ink(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface(context),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(color: AppColors.border(context)),
+                      ),
+                      child: InkWell(
+                        onTap: () =>
+                            pushSlide(context, const NoticeScreen()),
+                        child: Center(
+                          child: Icon(
+                            Symbols.notifications_rounded,
+                            size: 23,
+                            weight: 600,
+                            color: AppColors.text(context),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  // Huy hiệu số thư chưa đọc. Vượt 9 thì hiện "9+" - con số
+                  // chính xác không đáng để huy hiệu phình ra che mất icon.
+                  if (unread > 0)
+                    Positioned(
+                      right: -3,
+                      top: -3,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 19),
+                        height: 19,
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger(context),
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(
+                            color: AppColors.bg(context),
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

@@ -37,6 +37,13 @@ android {
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
+
+        // flutter_appauth dựng sẵn activity nhận redirect của trình duyệt.
+        // Scheme này phải trùng MailConfig.redirectScheme trong
+        // lib/config/mail_config.dart và trùng URI đã khai trên Azure Portal.
+        manifestPlaceholders.putAll(
+            mapOf("appAuthRedirectScheme" to "com.tlu.studyplanner")
+        )
     }
 
     buildFeatures {

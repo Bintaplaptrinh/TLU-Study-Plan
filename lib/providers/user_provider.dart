@@ -10,6 +10,7 @@ import 'package:tlustudy_planner/services/auth_service.dart';
 import 'package:tlustudy_planner/services/credential_store.dart';
 import 'package:tlustudy_planner/services/daily_notification_service.dart';
 import 'package:tlustudy_planner/services/database_helper.dart';
+import 'package:tlustudy_planner/services/document_request_service.dart';
 import 'package:tlustudy_planner/services/log_service.dart';
 import 'package:tlustudy_planner/services/notification_service.dart';
 import 'package:tlustudy_planner/services/widget_service.dart';
@@ -845,6 +846,11 @@ class UserProvider extends ChangeNotifier {
     _lastDataReload = null;
     _loginProgress = '';
     _loginProgressPercent = 0.0;
+
+    // Bảng tra cứu đơn được lọc theo mã sinh viên và họ tên, nên phải quên đi
+    // cùng lúc với phiên - nếu không, người đăng nhập tiếp theo trên cùng máy
+    // sẽ thấy đơn của người trước.
+    DocumentRequestService.clearCache();
 
     await _prefs?.remove(_kStudentCode);
     await _prefs?.remove(_kSelectedSemesterId);

@@ -22,6 +22,22 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<!-- Nhận redirect của luồng OAuth hộp thư trường (flutter_appauth).
+	     Scheme phải trùng MailConfig.redirectScheme trong
+	     lib/config/mail_config.dart. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.tlu.studyplanner.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.tlu.studyplanner</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>

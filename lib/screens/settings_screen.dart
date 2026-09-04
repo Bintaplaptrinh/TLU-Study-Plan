@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:android_intent_plus/android_intent.dart';
+import 'package:tlustudy_planner/config/app_info.dart';
 import 'package:tlustudy_planner/providers/theme_provider.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
 import 'package:tlustudy_planner/screens/login_screen.dart';
@@ -11,13 +12,13 @@ import 'package:tlustudy_planner/services/log_service.dart';
 import 'package:tlustudy_planner/widgets/cupertino_widgets.dart';
 // import 'package:tlustudy_planner/services/daily_notification_service.dart'; // Commented out with test button
 
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
 import 'package:tlustudy_planner/widgets/app_snackbar.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:tlustudy_planner/i18n/locale_provider.dart';
 import 'package:tlustudy_planner/widgets/calendar_widgets.dart';
 import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
+import 'package:tlustudy_planner/widgets/mail_connection_card.dart';
 import 'package:tlustudy_planner/widgets/student_barcode.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -613,10 +614,8 @@ class SettingsScreen extends StatelessWidget {
                                         onPressed: () async {
                                           try {
                                             if (Platform.isAndroid) {
-                                              final PackageInfo packageInfo =
-                                                  await PackageInfo.fromPlatform();
                                               final String packageName =
-                                                  packageInfo.packageName;
+                                                  AppInfo.packageName;
 
                                               final AndroidIntent
                                               intent = AndroidIntent(
@@ -690,10 +689,8 @@ class SettingsScreen extends StatelessWidget {
                             try {
                               if (Platform.isAndroid) {
                                 // Android: Open app notification settings using AndroidIntent
-                                final PackageInfo packageInfo =
-                                    await PackageInfo.fromPlatform();
                                 final String packageName =
-                                    packageInfo.packageName;
+                                    AppInfo.packageName;
 
                                 final AndroidIntent intent = AndroidIntent(
                                   action:
@@ -826,6 +823,20 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
         ),
+        // ── Kết nối ───────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+            child: TrText(
+              'Kết nối',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
+        const SliverToBoxAdapter(child: MailConnectionCard()),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
@@ -924,16 +935,19 @@ class SettingsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
+                  // Số phiên bản và ngày phát hành đều lấy từ AppInfo, nên
+                  // chỉ cần sửa `version:` trong pubspec.yaml (và
+                  // AppInfo.releaseDate) là mọi nơi trong app đổi theo.
                   _buildInfoRowNoneIcon(
                     context,
                     'Phiên bản',
-                    '2.0.0',
+                    AppInfo.version,
                   ),
                   const SizedBox(height: 16),
                   _buildInfoRowNoneIcon(
                     context,
                     'Ngày phát hành',
-                    '26-08-2026',
+                    AppInfo.releaseDate,
                   ),
                 ],
               ),

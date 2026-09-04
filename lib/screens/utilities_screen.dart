@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:tlustudy_planner/i18n/tr_text.dart';
 import 'package:tlustudy_planner/providers/user_provider.dart';
+import 'package:tlustudy_planner/screens/documents_screen.dart';
 import 'package:tlustudy_planner/screens/enrollment_screen.dart';
 import 'package:tlustudy_planner/screens/utility_section_screen.dart';
 import 'package:tlustudy_planner/theme/app_colors.dart';
@@ -28,7 +29,15 @@ class UtilitiesScreen extends StatelessWidget {
       subtitle: 'Đăng ký, hủy lớp học phần theo đợt',
       icon: Icons.app_registration_rounded,
       color: Color(0xFF2563EB),
+      destination: UtilityDestination.enrollment,
       highlight: true,
+    ),
+    _UtilityEntry(
+      title: 'Đơn từ',
+      subtitle: 'Tạo, nộp và tra cứu đơn',
+      icon: Icons.description_rounded,
+      color: Color(0xFFDB2777),
+      destination: UtilityDestination.documents,
     ),
     _UtilityEntry(
       title: 'Điểm số',
@@ -120,10 +129,15 @@ class UtilitiesScreen extends StatelessWidget {
   }
 }
 
+/// Màn hình riêng mà một thẻ có thể mở, khi thẻ đó không phải là một mục của
+/// [UtilitySectionScreen].
+enum UtilityDestination { enrollment, documents }
+
 /// Mô tả một thẻ tiện ích.
 ///
-/// [section] rỗng nghĩa là thẻ mở một màn hình riêng chứ không phải một mục
-/// của [UtilitySectionScreen] - hiện chỉ có "Đăng ký môn học".
+/// Một thẻ mở *hoặc* một mục của [UtilitySectionScreen] ([section]), *hoặc*
+/// một màn hình riêng ([destination]) - đúng một trong hai, không bao giờ cả
+/// hai cùng rỗng.
 class _UtilityEntry {
   const _UtilityEntry({
     required this.title,
@@ -131,14 +145,21 @@ class _UtilityEntry {
     required this.icon,
     required this.color,
     this.section,
+    this.destination,
     this.highlight = false,
-  });
+  }) : assert(
+         (section == null) != (destination == null),
+         'Mỗi thẻ mở đúng một đích đến',
+       );
 
   final String title;
   final String subtitle;
   final IconData icon;
   final Color color;
   final UtilitySection? section;
+
+  /// Màn hình riêng, khi thẻ không thuộc [UtilitySectionScreen].
+  final UtilityDestination? destination;
 
   /// Vẽ viền đậm hơn để thẻ nổi lên khỏi lưới.
   final bool highlight;
@@ -158,13 +179,18 @@ class _UtilityCardState extends State<_UtilityCard> {
   bool _pressed = false;
 
   void _open() {
-    final section = widget.entry.section;
-    pushSlide(
-      context,
-      section == null
-          ? const EnrollmentScreen()
-          : UtilitySectionScreen(section: section),
-    );
+    final entry = widget.entry;
+    final section = entry.section;
+    if (section != null) {
+      pushSlide(context, UtilitySectionScreen(section: section));
+      return;
+    }
+    switch (entry.destination!) {
+      case UtilityDestination.enrollment:
+        pushSlide(context, const EnrollmentScreen());
+      case UtilityDestination.documents:
+        pushSlide(context, const DocumentsScreen());
+    }
   }
 
   @override

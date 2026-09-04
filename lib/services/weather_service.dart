@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:tlustudy_planner/config/app_secrets.dart';
 import 'package:tlustudy_planner/models/weather_info.dart';
 
 /// Loads current conditions from OpenWeatherMap.
@@ -11,7 +12,10 @@ import 'package:tlustudy_planner/models/weather_info.dart';
 /// simply too slow, it falls back to fixed Ho Chi Minh City coordinates so the
 /// card always shows something useful.
 class WeatherService {
-  static const String _apiKey = '5864a5ae48df5a6c66a80c0147077957';
+  /// Khoá đến từ `--dart-define-from-file=env.json`, không nằm trong mã nguồn.
+  /// Xem `lib/config/app_secrets.dart`.
+  static const String _apiKey = AppSecrets.openWeatherApiKey;
+
   static const String _endpoint =
       'https://api.openweathermap.org/data/2.5/weather';
 
@@ -36,6 +40,15 @@ class WeatherService {
     bool forceRefresh = false,
     String lang = 'vi',
   }) async {
+    // Chặn ngay từ đầu: không có khoá thì mọi bước sau (xin quyền vị trí, gọi
+    // mạng) đều vô ích, và OpenWeather trả 401 với thông điệp tiếng Anh mà
+    // người dùng không hiểu.
+    if (_apiKey.isEmpty) {
+      throw const WeatherException(
+        'Chưa cấu hình khoá thời tiết cho bản cài đặt này.',
+      );
+    }
+
     final cached = _cached;
     final cachedAt = _cachedAt;
     if (!forceRefresh &&
@@ -80,6 +93,10 @@ class WeatherService {
     );
 
     final response = await http.get(uri).timeout(_requestTimeout);
+    if (response.statusCode == 401) {
+      // Khoá sai hoặc đã bị thu hồi - tách riêng để khỏi lẫn với lỗi mạng.
+      throw const WeatherException('Khoá thời tiết không hợp lệ.');
+    }
     if (response.statusCode != 200) {
       throw const WeatherException('Không tải được thời tiết hôm nay.');
     }

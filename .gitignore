@@ -79,6 +79,15 @@ storage/*
 *.zip
 .gitignore.bak
 
+# --- Khoá API (KHÔNG BAO GIỜ COMMIT) ---
+# env.json giữ khoá OpenWeather và client ID của hộp thư trường, nạp vào bản
+# build bằng --dart-define-from-file. Rule `*.json` bên dưới đã bắt được nó,
+# nhưng vẫn ghi riêng ở đây: nếu sau này ai đó nới lỏng `*.json` thì dòng này
+# vẫn giữ khoá không bị đẩy lên GitHub.
+env.json
+env.*.json
+!env.example.json
+
 # --- Cấu hình sinh tự động ---
 # `*.json` cố tình chặn rộng: google-services.json, firebase config, dump API
 # thường lẫn vào đây. Cần commit một file .json cụ thể thì thêm ngoại lệ, ví dụ:
@@ -86,9 +95,19 @@ storage/*
 *.json
 *.html
 
+# Hai file .json phải theo repo: file mẫu khoá API, và cấu hình chạy của
+# VS Code (đã kèm sẵn cờ --dart-define-from-file để khỏi ai phải nhớ).
+!env.example.json
+!.vscode/launch.json
+
 # --- Tài liệu nội bộ ---
 # docs/ chứa ghi chú truy vết API và ID sinh viên thật, không nên công khai.
-docs/
+# Dùng `docs/*` chứ không phải `docs/`: git không cho phép mở lại một file nằm
+# trong thư mục đã bị loại, nên muốn giữ ngoại lệ thì phải loại theo nội dung.
+docs/*
+# Hướng dẫn cấu hình kết nối email - không chứa dữ liệu thật, người clone repo
+# cần đến nó.
+!docs/mail_setup.md
 
 # Ghi chú tạm ở thư mục gốc (ARCHITECTURE.md, *_FIX.md, *_COMPLETE.md...).
 # Trước đây phải liệt kê tay ~90 file; rule này bắt hết và tự bắt cả file mới.
