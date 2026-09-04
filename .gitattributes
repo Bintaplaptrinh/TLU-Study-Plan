@@ -1,0 +1,40 @@
+# Chuẩn hoá ký tự xuống dòng.
+#
+# Trước file này, repo lẫn lộn CRLF và LF: mỗi lần một máy Windows mở rồi lưu
+# một file là git báo "đã sửa" toàn bộ file dù không đổi một chữ nào - có lúc
+# 91 file cùng lúc, đủ để chôn thay đổi thật trong diff.
+#
+# `text=auto` để git tự nhận đâu là văn bản, lưu trong repo bằng LF, và trả về
+# cho thư mục làm việc theo quy ước của từng hệ điều hành. Máy Windows vẫn
+# thấy CRLF như bình thường.
+* text=auto
+
+# Script và cấu hình phải giữ LF kể cả trên Windows: Gradle wrapper và shell
+# script chạy trên Linux/macOS (kể cả trong GitHub Actions) sẽ hỏng nếu dính
+# CRLF.
+*.sh        text eol=lf
+gradlew     text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+
+# File của Windows thì ngược lại, luôn CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+gradlew.bat text eol=crlf
+
+# Nhị phân: không đụng vào, và không cố hiển thị diff.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.ttf       binary
+*.otf       binary
+*.woff      binary
+*.woff2     binary
+*.jks       binary
+*.keystore  binary
+*.p12       binary
+*.pdf       binary
+*.zip       binary
