@@ -20,6 +20,7 @@ import 'package:tlustudy_planner/widgets/calendar_widgets.dart';
 import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 import 'package:tlustudy_planner/widgets/mail_connection_card.dart';
 import 'package:tlustudy_planner/widgets/student_barcode.dart';
+import 'package:tlustudy_planner/widgets/update_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -954,6 +955,9 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
+        // Cập nhật ứng dụng: đọc tag mới nhất trên GitHub Releases, tải và
+        // cài ngay trong app. Thẻ tự ẩn trên iOS.
+        const SliverToBoxAdapter(child: UpdateCard()),
 
         SliverToBoxAdapter(
           child: SizedBox(height: FloatingNavBar.bottomInset(context)),

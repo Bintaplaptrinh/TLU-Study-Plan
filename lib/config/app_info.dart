@@ -36,7 +36,13 @@ class AppInfo {
   /// Giá trị hiển thị khi chưa kịp đọc `pubspec` (ví dụ khung nền chạy trước
   /// khi [load] xong). Nên giữ khớp với `pubspec.yaml`, nhưng nếu lệch thì
   /// giá trị thật vẫn thắng ngay khi [load] chạy xong.
-  static const String fallbackVersion = '2.1.7';
+  ///
+  /// Từ khi có chức năng tự kiểm tra cập nhật, giá trị lệch không còn chỉ là
+  /// một dòng chữ sai trong Cài đặt: [UpdateService] so tag trên GitHub với
+  /// [version], nên một fallback cũ hơn thực tế sẽ khiến ứng dụng mời người
+  /// dùng "cập nhật" lên đúng bản họ đang chạy. `test/app_config_test.dart`
+  /// canh cho hai chỗ này luôn khớp nhau.
+  static const String fallbackVersion = '2.2.0';
 
   // ── Đọc từ pubspec/native lúc chạy ──────────────────────────────────────
 

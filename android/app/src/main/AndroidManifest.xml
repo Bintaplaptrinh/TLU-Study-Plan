@@ -14,6 +14,13 @@
          when the user declines). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <!-- Cập nhật trong ứng dụng: tải bản .apk mới từ GitHub Releases rồi
+         giao cho trình cài đặt của hệ thống. Từ Android 8 (API 26), quyền này
+         là điều kiện cần - nhưng chưa đủ: người dùng vẫn phải tự bật công tắc
+         "Cài ứng dụng không rõ nguồn gốc" cho riêng ứng dụng này, và hệ thống
+         sẽ tự hỏi khi trình cài đặt được mở lần đầu. Xem
+         lib/services/update_service.dart. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <application
         android:label="TLU Study Planner"
@@ -110,6 +117,16 @@
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="http"/>
+        </intent>
+        <!-- Trình cài đặt gói của hệ thống. Android 11+ ẩn mọi ứng dụng khác
+             khỏi tầm nhìn, nên nếu không khai ở đây thì việc mở tệp .apk vừa
+             tải về sẽ lặng lẽ không tìm thấy ứng dụng nào xử lý. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="application/vnd.android.package-archive"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE"/>
         </intent>
     </queries>
 </manifest>

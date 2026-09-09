@@ -78,19 +78,41 @@ jobs:
           cp -r Runner.app Payload
           zip -r app-release.ipa Payload
         
+      # Tag phai la vX.Y.Z, lay thang tu pubspec.yaml. Chuc nang "kiem tra
+      # cap nhat" trong app so tag nay voi AppInfo.version, nen mot tag khong
+      # doc duoc so phien ban (kieu release_2026.09.04) se bi bo qua va sinh
+      # vien khong bao gio duoc moi cap nhat. Xem
+      # lib/services/update_service.dart.
       - name: Generate Release Tag
         id: tag
         run: |
-          echo "release_tag=release_$(date +"%Y.%m.%d_%H-%M")" >> $GITHUB_OUTPUT
+          VERSION=$(grep -m1 '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//' | cut -d'+' -f1 | tr -d '[:space:]')
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "pubspec version '$VERSION' khong dung dang x.y.z" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release_tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      # Ten tep dinh kem cung la mot phan cua giao uoc: khi GitHub API khong
+      # tra ve danh sach asset, app dung duong dan
+      # .../download/<tag>/tlu-study-plan.apk lam duong lui.
+      - name: Rename artifacts
+        run: |
+          mkdir -p release
+          cp build/app/outputs/flutter-apk/app-release.apk release/tlu-study-plan.apk
+          cp build/app/outputs/bundle/release/app-release.aab release/tlu-study-plan.aab
+          cp build/ios/iphoneos/app-release.ipa release/tlu-study-plan.ipa
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
+          name: v${{ steps.tag.outputs.version }}
           files: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
-            build/ios/iphoneos/app-release.ipa
+            release/tlu-study-plan.apk
+            release/tlu-study-plan.aab
+            release/tlu-study-plan.ipa
           draft: false
           prerelease: false
           generate_release_notes: true

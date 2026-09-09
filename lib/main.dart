@@ -15,8 +15,8 @@ import 'package:tlustudy_planner/providers/mail_provider.dart';
 import 'package:tlustudy_planner/services/notification_service.dart';
 import 'package:tlustudy_planner/services/daily_notification_service.dart';
 import 'package:tlustudy_planner/theme/app_theme.dart';
-import 'package:tlustudy_planner/screens/home_shell.dart';
-import 'package:tlustudy_planner/widgets/mail_poller.dart';
+import 'package:tlustudy_planner/screens/app_gate.dart';
+import 'package:tlustudy_planner/widgets/update_watcher.dart';
 import 'package:tlustudy_planner/utils/error_logger.dart';
 
 void main() async {
@@ -127,7 +127,9 @@ class MyApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const MailPoller(child: HomeShell()),
+          // UpdateWatcher bọc ngoài cùng - bên ngoài cả cổng đăng nhập - để
+          // người chưa đăng nhập được vẫn nhận được lời mời cập nhật.
+          home: const UpdateWatcher(child: AppGate()),
           debugShowCheckedModeBanner: false,
         );
       },

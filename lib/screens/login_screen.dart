@@ -92,8 +92,13 @@ class _LoginScreenState extends State<LoginScreen> {
         duration: const Duration(seconds: 2),
       );
 
-      // Go back to settings screen
-      Navigator.of(context).pop();
+      // Mở từ Cài đặt thì đóng lại để lộ trang bên dưới. Còn khi màn hình này
+      // đang là cổng đăng nhập ở gốc ứng dụng thì không có gì để đóng -
+      // AppGate tự đổi sang khung chính ngay khi UserProvider báo đã đăng
+      // nhập, và gọi pop ở đó sẽ làm sập cả Navigator gốc.
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       setState(
         () => _errorMessage = e.toString().replaceAll('Exception: ', ''),
@@ -134,19 +139,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Stack(
                   children: [
-                    // Back button
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.arrow_back_rounded,
-                          color: colorScheme.onPrimaryContainer,
+                    // Nút quay lại chỉ có nghĩa khi màn hình này được mở chồng
+                    // lên một trang khác (từ Cài đặt). Khi nó là cổng đăng
+                    // nhập ở gốc ứng dụng thì phía sau không còn gì, và một
+                    // nút back không làm được gì chỉ khiến người dùng bối rối.
+                    if (Navigator.of(context).canPop())
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.arrow_back_rounded,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          tooltip: 'Quay lại',
                         ),
-                        onPressed: () => Navigator.of(context).pop(),
-                        tooltip: 'Quay lại',
                       ),
-                    ),
                     // Center content
                     Center(
                       child: Column(
