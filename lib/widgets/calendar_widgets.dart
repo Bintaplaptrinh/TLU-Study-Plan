@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'glass_surface.dart';
 import 'package:provider/provider.dart';
 
 import 'package:tlustudy_planner/i18n/locale_provider.dart';
@@ -31,77 +32,78 @@ class SegmentedPill<T> extends StatelessWidget {
         final width = constraints.maxWidth;
         final segWidth = width / count;
 
-        return Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceAlt(context),
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(color: AppColors.border(context)),
-          ),
-          child: Stack(
-            children: [
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutCubic,
-                left: (index < 0 ? 0 : index) * segWidth,
-                top: 0,
-                bottom: 0,
-                width: segWidth,
-                child: Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: AppColors.accentGradient(context),
+        return GlassSurface(
+          radius: AppRadius.pill,
+          clear: true,
+          blur: 14,
+          child: SizedBox(
+            height: height,
+            child: Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  left: (index < 0 ? 0 : index) * segWidth,
+                  top: 0,
+                  bottom: 0,
+                  width: segWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.glassSelected(context),
+                        border: Border.all(
+                          color: AppColors.glassBorder(context),
+                        ),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                   ),
                 ),
-              ),
-              Row(
-                children: [
-                  for (final seg in segments)
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => onChanged(seg.value),
-                        child: Center(
-                          child: AnimatedDefaultTextStyle(
-                            duration: const Duration(milliseconds: 200),
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: seg.value == value
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                              color: seg.value == value
-                                  ? Colors.white
-                                  : AppColors.textSoft(context),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (seg.icon != null) ...[
-                                  Icon(
-                                    seg.icon,
-                                    size: 17,
-                                    weight: 600,
-                                    color: seg.value == value
-                                        ? Colors.white
-                                        : AppColors.textSoft(context),
-                                  ),
-                                  const SizedBox(width: 6),
+                Row(
+                  children: [
+                    for (final seg in segments)
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => onChanged(seg.value),
+                          child: Center(
+                            child: AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 200),
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: seg.value == value
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                color: seg.value == value
+                                    ? AppColors.accent(context)
+                                    : AppColors.textSoft(context),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (seg.icon != null) ...[
+                                    Icon(
+                                      seg.icon,
+                                      size: 17,
+                                      weight: 600,
+                                      color: seg.value == value
+                                          ? AppColors.accent(context)
+                                          : AppColors.textSoft(context),
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  TrText(seg.label),
                                 ],
-                                TrText(seg.label),
-                              ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -125,6 +127,7 @@ class WeekStrip extends StatefulWidget {
     required this.selectedDate,
     required this.onSelect,
     required this.hasEvents,
+    this.hasExams,
     this.onWeekChanged,
     this.height = 92,
   });
@@ -134,6 +137,7 @@ class WeekStrip extends StatefulWidget {
 
   /// Whether a dot should be shown under a given day.
   final bool Function(DateTime) hasEvents;
+  final bool Function(DateTime)? hasExams;
 
   /// Fired with the Monday of the week the user swiped to.
   final ValueChanged<DateTime>? onWeekChanged;
@@ -190,13 +194,15 @@ class _WeekStripState extends State<WeekStrip> {
       child: PageView.builder(
         controller: _controller,
         onPageChanged: (page) {
-          final monday =
-              _anchorMonday.add(Duration(days: (page - _initialPage) * 7));
+          final monday = _anchorMonday.add(
+            Duration(days: (page - _initialPage) * 7),
+          );
           widget.onWeekChanged?.call(monday);
         },
         itemBuilder: (context, page) {
-          final monday =
-              _anchorMonday.add(Duration(days: (page - _initialPage) * 7));
+          final monday = _anchorMonday.add(
+            Duration(days: (page - _initialPage) * 7),
+          );
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
@@ -211,8 +217,14 @@ class _WeekStripState extends State<WeekStrip> {
                           monday.add(Duration(days: i)),
                           widget.selectedDate,
                         ),
-                        hasEvents:
-                            widget.hasEvents(monday.add(Duration(days: i))),
+                        hasExams:
+                            widget.hasExams?.call(
+                              monday.add(Duration(days: i)),
+                            ) ??
+                            false,
+                        hasEvents: widget.hasEvents(
+                          monday.add(Duration(days: i)),
+                        ),
                         onTap: () =>
                             widget.onSelect(monday.add(Duration(days: i))),
                       ),
@@ -235,6 +247,7 @@ class DayCell extends StatelessWidget {
     required this.selected,
     required this.hasEvents,
     required this.onTap,
+    this.hasExams = false,
     this.compact = false,
     this.muted = false,
   });
@@ -242,6 +255,7 @@ class DayCell extends StatelessWidget {
   final DateTime date;
   final bool selected;
   final bool hasEvents;
+  final bool hasExams;
   final VoidCallback onTap;
   final bool compact;
 
@@ -272,8 +286,8 @@ class DayCell extends StatelessWidget {
   /// pair of fixed lists instead of the translator.
   static List<String> weekdayInitials(BuildContext context) =>
       context.watch<LocaleProvider>().isEnglish
-          ? _weekdayInitialsEn
-          : _weekdayInitialsVi;
+      ? _weekdayInitialsEn
+      : _weekdayInitialsVi;
 
   @override
   Widget build(BuildContext context) {
@@ -283,10 +297,10 @@ class DayCell extends StatelessWidget {
     final Color numberColor = selected
         ? Colors.white
         : muted
-            ? AppColors.textMuted(context).withValues(alpha: 0.55)
-            : isToday
-                ? accent
-                : AppColors.text(context);
+        ? AppColors.textMuted(context).withValues(alpha: 0.55)
+        : isToday
+        ? accent
+        : AppColors.text(context);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -339,13 +353,17 @@ class DayCell extends StatelessWidget {
             const SizedBox(height: 5),
             AnimatedOpacity(
               duration: const Duration(milliseconds: 200),
-              opacity: hasEvents ? 1 : 0,
+              opacity: hasEvents || hasExams ? 1 : 0,
               child: Container(
                 width: 5,
                 height: 5,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: selected ? Colors.white : accent,
+                  color: hasExams
+                      ? AppColors.danger(context)
+                      : selected
+                      ? Colors.white
+                      : accent,
                 ),
               ),
             ),
@@ -364,12 +382,14 @@ class MonthGrid extends StatefulWidget {
     required this.selectedDate,
     required this.onSelect,
     required this.hasEvents,
+    this.hasExams,
     this.onMonthChanged,
   });
 
   final DateTime selectedDate;
   final ValueChanged<DateTime> onSelect;
   final bool Function(DateTime) hasEvents;
+  final bool Function(DateTime)? hasExams;
   final ValueChanged<DateTime>? onMonthChanged;
 
   @override
@@ -385,8 +405,10 @@ class _MonthGridState extends State<MonthGrid> {
   @override
   void initState() {
     super.initState();
-    _anchorMonth =
-        DateTime(widget.selectedDate.year, widget.selectedDate.month);
+    _anchorMonth = DateTime(
+      widget.selectedDate.year,
+      widget.selectedDate.month,
+    );
     _controller = PageController(initialPage: _initialPage);
   }
 
@@ -405,7 +427,8 @@ class _MonthGridState extends State<MonthGrid> {
   }
 
   int _pageFor(DateTime date) {
-    final months = (date.year - _anchorMonth.year) * 12 +
+    final months =
+        (date.year - _anchorMonth.year) * 12 +
         (date.month - _anchorMonth.month);
     return _initialPage + months;
   }
@@ -490,6 +513,7 @@ class _MonthGridState extends State<MonthGrid> {
             muted: date.month != month.month,
             selected: _isSameDay(date, widget.selectedDate),
             hasEvents: widget.hasEvents(date),
+            hasExams: widget.hasExams?.call(date) ?? false,
             onTap: () => widget.onSelect(date),
           );
         },

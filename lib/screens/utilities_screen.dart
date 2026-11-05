@@ -34,8 +34,8 @@ class UtilitiesScreen extends StatelessWidget {
     ),
     _UtilityEntry(
       title: 'Đơn từ',
-      subtitle: 'Tạo, nộp và tra cứu đơn',
-      icon: Icons.description_rounded,
+      subtitle: 'Tạm khóa · Nhà trường đã đổi quy trình',
+      icon: Icons.lock_rounded,
       color: Color(0xFFDB2777),
       destination: UtilityDestination.documents,
     ),

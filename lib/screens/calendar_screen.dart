@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:tlustudy_planner/providers/exam_provider.dart';
+import 'package:tlustudy_planner/widgets/timetable_card.dart';
+import 'package:tlustudy_planner/widgets/glass_button.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
@@ -10,8 +13,6 @@ import 'package:tlustudy_planner/utils/schedule_time.dart';
 import 'package:tlustudy_planner/widgets/calendar_widgets.dart';
 import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 import 'package:tlustudy_planner/widgets/class_card.dart';
-import 'package:tlustudy_planner/widgets/class_detail_sheet.dart';
-import 'package:tlustudy_planner/widgets/detail_sheet.dart';
 import 'package:tlustudy_planner/widgets/empty_state_widget.dart';
 import 'package:tlustudy_planner/widgets/styled_dropdown.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
@@ -150,6 +151,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   // ── calendar card ───────────────────────────────────────────────────────
 
   Widget _calendarCard(BuildContext context) {
+    context.watch<ExamProvider>();
     final userProvider = context.watch<UserProvider>();
 
     return Padding(
@@ -172,6 +174,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     key: const ValueKey('week'),
                     selectedDate: _selectedDate,
                     hasEvents: (d) => _hasClasses(userProvider, d),
+                    hasExams: (d) => _hasExams(context, d),
                     onSelect: (d) => setState(() => _select(d)),
                     onWeekChanged: (monday) => setState(() {
                       _focusedMonth = DateTime(monday.year, monday.month);
@@ -181,6 +184,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     key: const ValueKey('month'),
                     selectedDate: _selectedDate,
                     hasEvents: (d) => _hasClasses(userProvider, d),
+                    hasExams: (d) => _hasExams(context, d),
                     onSelect: (d) => setState(() => _select(d)),
                     onMonthChanged: (m) => setState(() => _focusedMonth = m),
                   ),
@@ -260,7 +264,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ];
     }
 
-    final slots = _classesOn(userProvider, _selectedDate);
+    final slots = timetableOn(
+      _classesOn(userProvider, _selectedDate),
+      context.watch<ExamProvider>().timetableExams,
+      _selectedDate,
+    );
     final now = DateTime.now();
     final isToday = _isSameDay(_selectedDate, now);
 
@@ -274,8 +282,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               padding: EdgeInsets.symmetric(vertical: 24),
               child: EmptyStateWidget(
                 icon: Symbols.event_available_rounded,
-                title: 'Không có lớp',
-                description: 'Chọn một ngày khác để xem lịch học',
+                title: 'Không có lịch',
+                description: 'Chọn một ngày khác để xem lịch học và lịch thi',
               ),
             ),
           )
@@ -287,24 +295,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
                 final slot = slots[i];
-                final state = isToday
-                    ? slot.stateAt(now)
-                    : ClassState.upcoming;
-                return ClassCard(
-                  course: slot.course,
-                  startLabel: slot.startLabel,
-                  endLabel: slot.endLabel,
-                  state: state,
-                  onTap: () => showDetailSheet(
-                    context,
-                    child: ClassDetailSheet(
-                      course: slot.course,
-                      startLabel: slot.startLabel,
-                      endLabel: slot.endLabel,
-                      state: state,
-                    ),
-                  ),
-                );
+                final state = isToday ? slot.stateAt(now) : ClassState.upcoming;
+                return TimetableCard(slot: slot, state: state);
               },
             ),
           ),
@@ -355,7 +347,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
             child: Text(
-              count == 0 ? context.tr('Nghỉ') : '$count ${context.tr('lớp')}',
+              count == 0 ? context.tr('Nghỉ') : '$count ${context.tr('mục')}',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -440,6 +432,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     ];
   }
 
+  bool _hasExams(BuildContext context, DateTime date) => timetableOn(
+    [],
+    context.read<ExamProvider>().timetableExams,
+    date,
+  ).isNotEmpty;
+
   bool _hasClasses(UserProvider userProvider, DateTime date) {
     if (!userProvider.isLoggedIn) return false;
     final apiWeekday = date.weekday + 1;
@@ -461,28 +459,11 @@ class _RoundButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final button = Material(
-      color: AppColors.surface(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: AppColors.border(context)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(
-            icon,
-            size: 21,
-            weight: 500,
-            color: AppColors.accent(context),
-          ),
-        ),
-      ),
+    return GlassIconButton(
+      icon: icon,
+      onTap: onTap,
+      tooltip: tooltip,
+      color: AppColors.accent(context),
     );
-
-    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }

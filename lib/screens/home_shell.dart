@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tlustudy_planner/providers/user_provider.dart';
+import 'package:tlustudy_planner/providers/exam_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:tlustudy_planner/screens/calendar_screen.dart';
@@ -51,6 +54,22 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
     FloatingNavItem(label: 'Tiện ích', icon: Symbols.apps_rounded),
     FloatingNavItem(label: 'Cài đặt', icon: Symbols.settings_rounded),
   ];
+
+  int? _loadedSemester;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final user = context.watch<UserProvider>();
+    final semester = user.selectedSemester?.id;
+    if (!user.isLoggedIn || semester == null || semester == _loadedSemester)
+      return;
+    _loadedSemester = semester;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ExamProvider>().loadTimetable(user.accessToken, semester);
+    });
+  }
 
   @override
   void dispose() {

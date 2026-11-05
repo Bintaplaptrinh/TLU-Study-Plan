@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:tlustudy_planner/widgets/glass_button.dart';
+import 'package:tlustudy_planner/providers/exam_provider.dart';
+import 'package:tlustudy_planner/widgets/timetable_card.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
@@ -11,8 +14,6 @@ import 'package:tlustudy_planner/theme/app_colors.dart';
 import 'package:tlustudy_planner/utils/page_transitions.dart';
 import 'package:tlustudy_planner/utils/schedule_time.dart';
 import 'package:tlustudy_planner/widgets/class_card.dart';
-import 'package:tlustudy_planner/widgets/class_detail_sheet.dart';
-import 'package:tlustudy_planner/widgets/detail_sheet.dart';
 import 'package:tlustudy_planner/widgets/empty_state_widget.dart';
 import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 import 'package:tlustudy_planner/widgets/weather_card.dart';
@@ -64,10 +65,24 @@ class _TodayScreenState extends State<TodayScreen> {
             }
 
             final today = DateTime(_now.year, _now.month, _now.day);
-            final classes = _todayClasses(userProvider, today);
+            final exams = context.watch<ExamProvider>();
+            final classes = timetableOn(
+              _todayClasses(userProvider, today),
+              exams.timetableExams,
+              today,
+            );
 
             return RefreshIndicator(
-              onRefresh: () async => setState(() => _now = DateTime.now()),
+              onRefresh: () async {
+                setState(() => _now = DateTime.now());
+                final semester = userProvider.selectedSemester?.id;
+                if (semester != null)
+                  await exams.loadTimetable(
+                    userProvider.accessToken,
+                    semester,
+                    force: true,
+                  );
+              },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
@@ -100,7 +115,7 @@ class _TodayScreenState extends State<TodayScreen> {
                           const Spacer(),
                           if (classes.isNotEmpty)
                             Text(
-                              '${classes.length} ${context.tr('lớp')}',
+                              '${classes.length} ${context.tr('mục')}',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -111,7 +126,7 @@ class _TodayScreenState extends State<TodayScreen> {
                       ),
                     ),
                   ),
-                  if (userProvider.isLoadingCourses)
+                  if (userProvider.isLoadingCourses || (exams.isLoadingTimetable && classes.isEmpty))
                     const SliverToBoxAdapter(
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 40),
@@ -124,7 +139,7 @@ class _TodayScreenState extends State<TodayScreen> {
                         padding: EdgeInsets.symmetric(vertical: 24),
                         child: EmptyStateWidget(
                           icon: Symbols.beach_access_rounded,
-                          title: 'Không có lớp hôm nay',
+                          title: 'Không có lịch hôm nay',
                           description: 'Hãy tận hưởng ngày nghỉ của bạn!',
                         ),
                       ),
@@ -138,21 +153,7 @@ class _TodayScreenState extends State<TodayScreen> {
                         itemBuilder: (context, i) {
                           final slot = classes[i];
                           final state = slot.stateAt(_now);
-                          return ClassCard(
-                            course: slot.course,
-                            startLabel: slot.startLabel,
-                            endLabel: slot.endLabel,
-                            state: state,
-                            onTap: () => showDetailSheet(
-                              context,
-                              child: ClassDetailSheet(
-                                course: slot.course,
-                                startLabel: slot.startLabel,
-                                endLabel: slot.endLabel,
-                                state: state,
-                              ),
-                            ),
-                          );
+                          return TimetableCard(slot: slot, state: state);
                         },
                       ),
                     ),
@@ -173,8 +174,8 @@ class _TodayScreenState extends State<TodayScreen> {
   // ── header ──────────────────────────────────────────────────────────────
 
   Widget _header(BuildContext context, UserProvider userProvider) {
-    final name = userProvider.tluUser?.displayName ??
-        userProvider.currentUser.fullName;
+    final name =
+        userProvider.tluUser?.displayName ?? userProvider.currentUser.fullName;
     final firstName = name.trim().split(' ').last;
 
     return Padding(
@@ -234,8 +235,9 @@ class _TodayScreenState extends State<TodayScreen> {
     List<ClassSlot> classes,
     UserProvider userProvider,
   ) {
-    final upcoming =
-        classes.where((s) => s.stateAt(_now) != ClassState.past).toList();
+    final upcoming = classes
+        .where((s) => s.stateAt(_now) != ClassState.past)
+        .toList();
     final remaining = upcoming.length;
     final ClassSlot? next = upcoming.isEmpty ? null : upcoming.first;
 
@@ -247,16 +249,14 @@ class _TodayScreenState extends State<TodayScreen> {
             child: _StatTile(
               icon: Symbols.menu_book_rounded,
               label: 'Còn lại',
-              value: classes.isEmpty
-                  ? '—'
-                  : '$remaining ${context.tr('lớp')}',
+              value: classes.isEmpty ? '—' : '$remaining ${context.tr('mục')}',
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: _StatTile(
               icon: Symbols.schedule_rounded,
-              label: 'Tiết kế tiếp',
+              label: 'Lịch kế tiếp',
               value: classes.isEmpty
                   ? '—'
                   : (next == null ? 'Đã xong' : next.startLabel),
@@ -272,11 +272,12 @@ class _TodayScreenState extends State<TodayScreen> {
   List<ClassSlot> _todayClasses(UserProvider userProvider, DateTime today) {
     // The API encodes Monday as 2 … Sunday as 8.
     final apiWeekday = today.weekday + 1;
-    final courses = userProvider
-        .getActiveCourses(today)
-        .where((c) => c.dayOfWeek == apiWeekday)
-        .toList()
-      ..sort((a, b) => a.startCourseHour.compareTo(b.startCourseHour));
+    final courses =
+        userProvider
+            .getActiveCourses(today)
+            .where((c) => c.dayOfWeek == apiWeekday)
+            .toList()
+          ..sort((a, b) => a.startCourseHour.compareTo(b.startCourseHour));
 
     return [
       for (final course in courses) ClassSlot.from(course, userProvider, today),
@@ -320,8 +321,12 @@ class _StatTile extends StatelessWidget {
               color: AppColors.accentTint(context),
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: Icon(icon,
-                size: 19, weight: 600, color: AppColors.accent(context)),
+            child: Icon(
+              icon,
+              size: 19,
+              weight: 600,
+              color: AppColors.accent(context),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -387,32 +392,9 @@ class _NoticeButton extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    clipBehavior: Clip.antiAlias,
-                    child: Ink(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface(context),
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(color: AppColors.border(context)),
-                      ),
-                      child: InkWell(
-                        onTap: () =>
-                            pushSlide(context, const NoticeScreen()),
-                        child: Center(
-                          child: Icon(
-                            Symbols.notifications_rounded,
-                            size: 23,
-                            weight: 600,
-                            color: AppColors.text(context),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  GlassIconButton(icon: Symbols.notifications_rounded,
+                    onTap: () => pushSlide(context, const NoticeScreen()),
+                    color: AppColors.text(context)),
                   // Huy hiệu số thư chưa đọc. Vượt 9 thì hiện "9+" - con số
                   // chính xác không đáng để huy hiệu phình ra che mất icon.
                   if (unread > 0)
@@ -425,8 +407,7 @@ class _NoticeButton extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 5),
                         decoration: BoxDecoration(
                           color: AppColors.danger(context),
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.pill),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                           border: Border.all(
                             color: AppColors.bg(context),
                             width: 2,

@@ -2,10 +2,9 @@
 
 A modern Flutter application for TLU students to manage their study schedule, view course information, track exams, and access academic data.
 
-> **Version 2.2** adds a Notifications hub with the university mailbox
-> (Microsoft Graph, read-only), replaces the Home avatar with a bell that
-> carries an unread badge, and moves every API key out of the source tree.
-> See [What's new in 2.2](#whats-new-in-22).
+> **Version 3.0** brings the liquid glass controls from `tlu_schedule_flutter`,
+> exams in the daily agenda and calendar, live school announcements, and WeatherAPI.com.
+> See [3.0 release notes](.github/release-notes/v3.0.0.md).
 
 ## Features
 
@@ -20,13 +19,12 @@ A modern Flutter application for TLU students to manage their study schedule, vi
 - **Auto Data Sync** - Automatic refresh every 30 days
 - **Offline Mode** - Cached data stays readable without a connection
 
-### Notifications hub *(new in 2.2)*
+### Notifications hub
 
 Reached from the bell in the Home header, which shows an unread-mail badge.
 Two pills split the page:
 
-- **Thông báo** - university announcements. Placeholder for now (*Đang phát triển*);
-  there is no feed to read from yet.
+- **Thông báo** - live university announcements with skeleton loading and an in-app article viewer;
 - **Mail** - the student's `@tlu.edu.vn` inbox, **read-only**.
   - **One-time sign-in** via OAuth 2.0 + PKCE in the system browser
   - **Refresh token in the platform keystore** (Android KeyStore / iOS Keychain),
@@ -137,14 +135,14 @@ project root, which is **gitignored**, and reach the build through
 
 ```json
 {
-  "OPENWEATHER_API_KEY": "your-key-here",
+  "WEATHER_API_KEY": "your-key-here",
   "TLU_MAIL_CLIENT_ID": "your-azure-client-id"
 }
 ```
 
 | Key | Needed for | Where to get it |
 |---|---|---|
-| `OPENWEATHER_API_KEY` | Home weather card | <https://home.openweathermap.org/api_keys> |
+| `WEATHER_API_KEY` | Home weather card | <https://www.weatherapi.com/docs/> |
 | `TLU_MAIL_CLIENT_ID` | Notifications -> Mail | Azure app registration, see [`docs/mail_setup.md`](docs/mail_setup.md) |
 
 The app builds and runs with either key missing - only the feature that needs
@@ -266,5 +264,5 @@ This project is private and intended for TLU students only.
 
 ## Version
 
-Current version: **2.2.0** <br>
-Release Date: **04/09/2026**
+Current version: **3.0.0** <br>
+Release Date: **05/11/2026**

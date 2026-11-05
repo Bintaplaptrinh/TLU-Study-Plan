@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'glass_button.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:tlustudy_planner/i18n/tr_text.dart';
@@ -84,14 +85,8 @@ class PageHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(child: titleBlock),
-            for (final action in actions) ...[
-              const SizedBox(width: 8),
-              action,
-            ],
-            if (trailing != null) ...[
-              const SizedBox(width: 12),
-              trailing!,
-            ],
+            for (final action in actions) ...[const SizedBox(width: 8), action],
+            if (trailing != null) ...[const SizedBox(width: 12), trailing!],
           ],
         ),
       );
@@ -114,10 +109,7 @@ class PageHeader extends StatelessWidget {
                 const SizedBox(width: 8),
                 action,
               ],
-              if (trailing != null) ...[
-                const SizedBox(width: 12),
-                trailing!,
-              ],
+              if (trailing != null) ...[const SizedBox(width: 12), trailing!],
             ],
           ),
           const SizedBox(height: 16),
@@ -149,33 +141,14 @@ class HeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-
-    final button = Material(
-      color: AppColors.surface(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: AppColors.border(context)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(
-            icon,
-            size: 21,
-            weight: 500,
-            color: enabled
-                ? AppColors.accent(context)
-                : AppColors.textMuted(context),
-          ),
-        ),
-      ),
+    return GlassIconButton(
+      icon: icon,
+      onTap: onTap,
+      tooltip: tooltip,
+      color: onTap == null
+          ? AppColors.textMuted(context)
+          : AppColors.accent(context),
     );
-
-    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 

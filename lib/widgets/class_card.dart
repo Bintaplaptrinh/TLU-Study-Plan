@@ -21,6 +21,7 @@ class ClassCard extends StatelessWidget {
     this.state = ClassState.upcoming,
     this.onTap,
     this.showTimeline = true,
+    this.isExam = false,
   });
 
   final StudentCourseSubject course;
@@ -31,13 +32,16 @@ class ClassCard extends StatelessWidget {
 
   /// Draws the vertical rail + dot on the left, timeline style.
   final bool showTimeline;
+  final bool isExam;
 
   @override
   Widget build(BuildContext context) {
     final active = state == ClassState.current;
     final dim = state == ClassState.past;
 
-    final accent = AppColors.accent(context);
+    final accent = isExam
+        ? AppColors.danger(context)
+        : AppColors.accent(context);
     final surface = AppColors.surface(context);
     final onCard = active ? Colors.white : AppColors.text(context);
     final softOnCard = active
@@ -57,7 +61,9 @@ class ClassCard extends StatelessWidget {
                   ? LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: AppColors.accentGradient(context),
+                      colors: isExam
+                          ? const [Color(0xFFDC2626), Color(0xFF991B1B)]
+                          : AppColors.accentGradient(context),
                     )
                   : null,
               color: active ? null : surface,
@@ -91,7 +97,7 @@ class ClassCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     if (active)
-                      _LiveBadge(color: Colors.white)
+                      _LiveBadge(color: Colors.white, isExam: isExam)
                     else
                       // Capped at a third of the card so a long code can never
                       // squeeze the title out; it wraps to a second line and
@@ -106,11 +112,11 @@ class ClassCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.accentTint(context),
+                            color: isExam ? Theme.of(context).colorScheme.errorContainer : AppColors.accentTint(context),
                             borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: Text(
-                            breakAnywhere(course.courseCode),
+                            isExam ? context.tr('LỊCH THI') : breakAnywhere(course.courseCode),
                             maxLines: 2,
                             softWrap: true,
                             textAlign: TextAlign.center,
@@ -206,7 +212,7 @@ class ClassCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          _Rail(active: active, dim: dim),
+          _Rail(active: active, dim: dim, isExam: isExam),
           const SizedBox(width: 12),
           Expanded(child: card),
         ],
@@ -216,10 +222,11 @@ class ClassCard extends StatelessWidget {
 }
 
 class _Rail extends StatelessWidget {
-  const _Rail({required this.active, required this.dim});
+  const _Rail({required this.active, required this.dim, this.isExam = false});
 
   final bool active;
   final bool dim;
+  final bool isExam;
 
   @override
   Widget build(BuildContext context) {
@@ -241,13 +248,19 @@ class _Rail extends StatelessWidget {
               height: active ? 12 : 9,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: active
+                color: isExam
+                    ? AppColors.danger(context)
+                    : active
                     ? accent
                     : (dim
                           ? AppColors.textMuted(context)
                           : AppColors.surface(context)),
                 border: Border.all(
-                  color: active ? accent : AppColors.textMuted(context),
+                  color: isExam
+                      ? AppColors.danger(context)
+                      : active
+                      ? accent
+                      : AppColors.textMuted(context),
                   width: 2,
                 ),
               ),
@@ -310,9 +323,10 @@ class _Meta extends StatelessWidget {
 }
 
 class _LiveBadge extends StatefulWidget {
-  const _LiveBadge({required this.color});
+  const _LiveBadge({required this.color, this.isExam = false});
 
   final Color color;
+  final bool isExam;
 
   @override
   State<_LiveBadge> createState() => _LiveBadgeState();
@@ -355,7 +369,7 @@ class _LiveBadgeState extends State<_LiveBadge>
           ),
           const SizedBox(width: 6),
           TrText(
-            'ĐANG HỌC',
+            widget.isExam ? 'ĐANG THI' : 'ĐANG HỌC',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,

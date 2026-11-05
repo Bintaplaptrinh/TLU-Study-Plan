@@ -9,6 +9,27 @@ class UiDictionary {
 
   /// Vietnamese → English. Keys are matched case-insensitively after trimming.
   static const Map<String, String> viToEn = {
+    'mục': 'events',
+    'Không có lịch hôm nay': 'No events today',
+    'Không có lịch': 'No events',
+    'Lịch kế tiếp': 'Next event',
+    'Chọn một ngày khác để xem lịch học và lịch thi': 'Choose another date to see classes and exams',
+
+    'Độ trong suốt của kính': 'Glass transparency',
+    'Đục': 'Opaque',
+    'Trong suốt': 'Transparent',
+    'Đơn từ tạm khóa': 'Forms temporarily locked',
+    'Tạm khóa · Nhà trường đã đổi quy trình':
+        'Locked · The school changed its process',
+    'Nhà trường đã thay đổi quy trình làm đơn. Vui lòng thực hiện theo hướng dẫn mới của nhà trường.':
+        'The school has changed its form process. Please follow the new instructions from the school.',
+    'Đang tải thông báo...': 'Loading notices...',
+    'Không tải được thông báo. Vui lòng thử lại.':
+        'Unable to load notices. Please try again.',
+    'ĐANG THI': 'EXAM IN PROGRESS',
+    'LỊCH THI': 'EXAM',
+    'Xem thêm': 'Load more',
+
     // ── Navigation & screen titles ──
     'Hôm nay': 'Today',
     'Lịch học': 'Schedule',
@@ -36,7 +57,8 @@ class UiDictionary {
     'Chọn học kỳ': 'Select semester',
     'Chưa chọn học kỳ': 'No semester selected',
     'Vui lòng chọn học kỳ': 'Please select a semester',
-    'Vui lòng chọn học kỳ trong cài đặt': 'Please select a semester in Settings',
+    'Vui lòng chọn học kỳ trong cài đặt':
+        'Please select a semester in Settings',
     'Đợt học': 'Study period',
     'Lần thi': 'Exam session',
     'Vui lòng chọn đợt học và lần thi':

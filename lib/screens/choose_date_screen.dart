@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tlustudy_planner/theme/app_theme.dart';
+import 'package:tlustudy_planner/widgets/glass_button.dart';
+import 'package:tlustudy_planner/utils/shell_scope.dart';
+import 'package:tlustudy_planner/widgets/floating_nav_bar.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
 
 class ChooseDateScreen extends StatefulWidget {
@@ -42,10 +45,13 @@ class _ChooseDateScreenState extends State<ChooseDateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
+        leading: ShellScope.maybeOf(context) != null
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
         title: const TrText('Choose Date'),
       ),
       body: Column(
@@ -71,27 +77,19 @@ class _ChooseDateScreenState extends State<ChooseDateScreen> {
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              padding: EdgeInsets.fromLTRB(
+                24,
+                0,
+                24,
+                ShellScope.maybeOf(context) != null
+                    ? FloatingNavBar.bottomInset(context)
+                    : 24,
+              ),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(_selectedDate),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentColor,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: TrText(
-                    'CONTINUE',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                  ),
+                child: GlassActionButton(
+                  onTap: () => Navigator.of(context).pop(_selectedDate),
+                  label: context.tr('CONTINUE'),
                 ),
               ),
             ),
@@ -172,10 +170,9 @@ class _MonthCalendar extends StatelessWidget {
               child: Center(
                 child: TrText(
                   label,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -212,7 +209,9 @@ class _DateCell extends StatelessWidget {
           color: isSelected ? AppTheme.accentColor : colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isToday ? AppTheme.accentColor : colorScheme.outlineVariant.withOpacity(0.3),
+            color: isToday
+                ? AppTheme.accentColor
+                : colorScheme.outlineVariant.withOpacity(0.3),
             width: isToday ? 2 : 1,
           ),
         ),
@@ -220,9 +219,9 @@ class _DateCell extends StatelessWidget {
           child: TrText(
             '${date.day}',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.black : colorScheme.onSurface,
-                ),
+              fontWeight: FontWeight.w700,
+              color: isSelected ? Colors.black : colorScheme.onSurface,
+            ),
           ),
         ),
       ),

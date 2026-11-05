@@ -31,7 +31,7 @@ android {
         applicationId = "com.tlu.studyplanner"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 2025110220
+        versionCode = 2026110500
         versionName = flutter.versionName
 
         ndk {

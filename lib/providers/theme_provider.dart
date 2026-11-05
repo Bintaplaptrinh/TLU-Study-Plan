@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
   bool _isDarkMode = false;
+  double _glassTransparency = 0.5;
+  double get glassTransparency => _glassTransparency;
   late SharedPreferences _prefs;
   static const String _themeKey = 'isDarkMode';
 
@@ -20,7 +22,17 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     _isDarkMode = _prefs.getBool(_themeKey) ?? false;
+    _glassTransparency = (_prefs.getDouble('glassTransparency') ?? 0.5).clamp(
+      0.0,
+      1.0,
+    );
     notifyListeners();
+  }
+
+  Future<void> setGlassTransparency(double value) async {
+    _glassTransparency = value.clamp(0.0, 1.0);
+    notifyListeners();
+    await _prefs.setDouble('glassTransparency', _glassTransparency);
   }
 
   /// Toggle theme and save to SharedPreferences

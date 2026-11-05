@@ -18,6 +18,27 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Tag phai la vX.Y.Z, lay thang tu pubspec.yaml. Chuc nang "kiem tra
+      # cap nhat" trong app so tag nay voi AppInfo.version, nen mot tag khong
+      # doc duoc so phien ban (kieu release_2026.09.04) se bi bo qua va sinh
+      # vien khong bao gio duoc moi cap nhat. Xem
+      # lib/services/update_service.dart.
+      - name: Generate Release Tag
+        id: tag
+        run: |
+          VERSION=$(grep -m1 '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//' | cut -d'+' -f1 | tr -d '[:space:]')
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "pubspec version '$VERSION' khong dung dang x.y.z" >&2
+            exit 1
+          fi
+          if [ ! -s ".github/release-notes/v$VERSION.md" ]; then
+            echo "Missing release notes: .github/release-notes/v$VERSION.md" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release_tag=v$VERSION" >> $GITHUB_OUTPUT
+
+
       # Add Java 21 setup step
       - name: Setup Java
         uses: actions/setup-java@v3
@@ -34,13 +55,13 @@ jobs:
       # va khong echo file ra log.
       - name: Create env.json
         env:
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
           TLU_MAIL_CLIENT_ID: ${{ secrets.TLU_MAIL_CLIENT_ID }}
         run: |
           python3 - <<'PY' > env.json
           import json, os
           json.dump({
-              "OPENWEATHER_API_KEY": os.environ.get("OPENWEATHER_API_KEY", ""),
+              "WEATHER_API_KEY": os.environ.get("WEATHER_API_KEY", ""),
               "TLU_MAIL_CLIENT_ID": os.environ.get("TLU_MAIL_CLIENT_ID", ""),
           }, __import__("sys").stdout)
           PY
@@ -78,22 +99,6 @@ jobs:
           cp -r Runner.app Payload
           zip -r app-release.ipa Payload
         
-      # Tag phai la vX.Y.Z, lay thang tu pubspec.yaml. Chuc nang "kiem tra
-      # cap nhat" trong app so tag nay voi AppInfo.version, nen mot tag khong
-      # doc duoc so phien ban (kieu release_2026.09.04) se bi bo qua va sinh
-      # vien khong bao gio duoc moi cap nhat. Xem
-      # lib/services/update_service.dart.
-      - name: Generate Release Tag
-        id: tag
-        run: |
-          VERSION=$(grep -m1 '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//' | cut -d'+' -f1 | tr -d '[:space:]')
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "pubspec version '$VERSION' khong dung dang x.y.z" >&2
-            exit 1
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "release_tag=v$VERSION" >> $GITHUB_OUTPUT
-
       # Ten tep dinh kem cung la mot phan cua giao uoc: khi GitHub API khong
       # tra ve danh sach asset, app dung duong dan
       # .../download/<tag>/tlu-study-plan.apk lam duong lui.
@@ -109,12 +114,13 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
           name: v${{ steps.tag.outputs.version }}
+          body_path: .github/release-notes/${{ steps.tag.outputs.release_tag }}.md
           files: |
             release/tlu-study-plan.apk
             release/tlu-study-plan.aab
             release/tlu-study-plan.ipa
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

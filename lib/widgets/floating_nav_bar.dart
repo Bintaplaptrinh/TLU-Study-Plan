@@ -1,6 +1,5 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'glass_surface.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:tlustudy_planner/i18n/tr_text.dart';
@@ -87,86 +86,68 @@ class FloatingNavBar extends StatelessWidget {
                   borderRadius: radius,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                      color: Colors.black.withValues(
+                        alpha: isDark ? 0.45 : 0.12,
+                      ),
                       blurRadius: 24,
                       offset: const Offset(0, 8),
                     ),
                   ],
                 ),
-                child: ClipRRect(
-                  borderRadius: radius,
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        // Đủ đục để chữ trên thanh còn đọc được, đủ trong để
-                        // thấy nội dung trôi bên dưới.
-                        color: AppColors.surface(
-                          context,
-                        ).withValues(alpha: isDark ? 0.58 : 0.72),
-                        borderRadius: radius,
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.10)
-                              : Colors.white.withValues(alpha: 0.65),
-                          width: 1,
+                child: GlassSurface(
+                  radius: barHeight / 2,
+                  clear: true,
+                  blur: 12,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Hàng tab giữ nguyên bề ngang ban đầu trong lúc vỏ
+                      // ngoài co lại, nên nó bị cắt dần đi chứ không bị bóp
+                      // méo (và không sinh lỗi tràn khi đang chạy).
+                      _Fade(
+                        visible: !collapsed,
+                        child: OverflowBox(
+                          minWidth: fullWidth,
+                          maxWidth: fullWidth,
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                for (var i = 0; i < items.length; i++)
+                                  Flexible(
+                                    child: _NavButton(
+                                      item: items[i],
+                                      selected: i == currentIndex,
+                                      onTap: () => onTap(i),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Hàng tab giữ nguyên bề ngang ban đầu trong lúc vỏ
-                          // ngoài co lại, nên nó bị cắt dần đi chứ không bị bóp
-                          // méo (và không sinh lỗi tràn khi đang chạy).
-                          _Fade(
-                            visible: !collapsed,
-                            child: OverflowBox(
-                              minWidth: fullWidth,
-                              maxWidth: fullWidth,
-                              alignment: Alignment.centerLeft,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    for (var i = 0; i < items.length; i++)
-                                      Flexible(
-                                        child: _NavButton(
-                                          item: items[i],
-                                          selected: i == currentIndex,
-                                          onTap: () => onTap(i),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
 
-                          _Fade(
-                            visible: collapsed,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: onBack,
-                                customBorder: const CircleBorder(),
-                                child: Center(
-                                  child: Icon(
-                                    Symbols.arrow_back_rounded,
-                                    size: 24,
-                                    weight: 600,
-                                    color: AppColors.accent(context),
-                                  ),
-                                ),
+                      _Fade(
+                        visible: collapsed,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onBack,
+                            customBorder: const CircleBorder(),
+                            child: Center(
+                              child: Icon(
+                                Symbols.arrow_back_rounded,
+                                size: 24,
+                                weight: 600,
+                                color: AppColors.accent(context),
                               ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -237,7 +218,7 @@ class _NavButton extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: selected ? AppColors.accentTint(context) : null,
+                color: selected ? AppColors.glassSelected(context) : null,
                 shape: BoxShape.circle,
               ),
               child: Icon(

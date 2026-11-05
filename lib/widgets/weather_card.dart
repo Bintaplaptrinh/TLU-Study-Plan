@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -59,7 +60,7 @@ class _WeatherCardState extends State<WeatherCard>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // OpenWeather localises the description and city name, so switching the
+    // WeatherAPI localises the description and city name, so switching the
     // app language means asking for a fresh reading rather than translating.
     final lang = context.watch<LocaleProvider>().code;
     if (lang != _lang) {
@@ -183,6 +184,18 @@ class _WeatherCardState extends State<WeatherCard>
                       ),
                     );
                   }),
+                ),
+              ),
+              Positioned(
+                left: 82,
+                bottom: 6,
+                child: TextButton(
+                  onPressed: () => launchUrl(Uri.parse('https://www.weatherapi.com/'),
+                    mode: LaunchMode.externalApplication),
+                  style: TextButton.styleFrom(foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 32)),
+                  child: const Text('WeatherAPI.com', style: TextStyle(fontSize: 10)),
                 ),
               ),
               Positioned(

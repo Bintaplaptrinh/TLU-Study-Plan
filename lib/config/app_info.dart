@@ -31,7 +31,7 @@ class AppInfo {
   // ── Thứ duy nhất phải sửa tay ở file này ────────────────────────────────
 
   /// Ngày phát hành bản hiện tại, hiển thị trong Cài đặt → Thông tin.
-  static const String releaseDate = '04-09-2026';
+  static const String releaseDate = '05-11-2026';
 
   /// Giá trị hiển thị khi chưa kịp đọc `pubspec` (ví dụ khung nền chạy trước
   /// khi [load] xong). Nên giữ khớp với `pubspec.yaml`, nhưng nếu lệch thì
@@ -42,7 +42,7 @@ class AppInfo {
   /// [version], nên một fallback cũ hơn thực tế sẽ khiến ứng dụng mời người
   /// dùng "cập nhật" lên đúng bản họ đang chạy. `test/app_config_test.dart`
   /// canh cho hai chỗ này luôn khớp nhau.
-  static const String fallbackVersion = '2.2.0';
+  static const String fallbackVersion = '3.0.0';
 
   // ── Đọc từ pubspec/native lúc chạy ──────────────────────────────────────
 

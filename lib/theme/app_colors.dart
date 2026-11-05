@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'glass_appearance.dart';
 
 /// Design tokens for TLU Study Planner.
 ///
@@ -73,6 +74,32 @@ class AppColors {
   static Color onAccent(BuildContext c) =>
       _isDark(c) ? const Color(0xFF08111F) : Colors.white;
 
+  // Glass palette ported from tlu_schedule_flutter/theme/app_colors.dart.
+  static double glassAlpha(BuildContext c, double alpha) =>
+      (Theme.of(c).extension<GlassAppearance>() ?? const GlassAppearance())
+          .alpha(alpha);
+  static Color _glass(BuildContext c, Color light, Color dark) {
+    final color = _isDark(c) ? dark : light;
+    return color.withValues(alpha: glassAlpha(c, color.a));
+  }
+
+  static Color glass(BuildContext c) =>
+      _glass(c, const Color(0xB8FFFFFF), const Color(0xC22D3544));
+  static Color glassSoft(BuildContext c) =>
+      _glass(c, const Color(0x70FFFFFF), const Color(0x99212A39));
+  static Color glassClear(BuildContext c) =>
+      _glass(c, const Color(0x2EFFFFFF), const Color(0x332D3544));
+  static Color glassClearSoft(BuildContext c) =>
+      _glass(c, const Color(0x0FFFFFFF), const Color(0x191C2533));
+  static Color glassBorder(BuildContext c) =>
+      _isDark(c) ? const Color(0x40FFFFFF) : const Color(0xCCFFFFFF);
+  static Color glassSelected(BuildContext c) =>
+      _isDark(c) ? const Color(0x26FFFFFF) : const Color(0x18246BFD);
+  static Color glassShadow(BuildContext c) =>
+      Colors.black.withValues(alpha: _isDark(c) ? .24 : .10);
+  static Color bgDeep(BuildContext c) =>
+      _isDark(c) ? const Color(0xFF0F172A) : const Color(0xFFF0F1F3);
+
   /// The gradient used by the "selected day" pill and the primary CTA.
   static List<Color> accentGradient(BuildContext c) => _isDark(c)
       ? const [blue500, Color(0xFF1E40AF)]
@@ -85,7 +112,6 @@ class AppColors {
       _isDark(c) ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
   static Color danger(BuildContext c) =>
       _isDark(c) ? const Color(0xFFF87171) : const Color(0xFFDC2626);
-
 }
 
 /// Shared shape / spacing tokens so radii stay consistent across screens.

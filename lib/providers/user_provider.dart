@@ -1002,6 +1002,7 @@ class UserProvider extends ChangeNotifier {
     if (semester != null && token != null && _examProvider != null) {
       try {
         await _examProvider!.fetchExamSchedule(token, semester.id);
+        await _examProvider!.loadTimetable(token, semester.id, force: true);
       } catch (e) {
         _log.log('Exam refresh failed: $e', level: LogLevel.warning);
       }

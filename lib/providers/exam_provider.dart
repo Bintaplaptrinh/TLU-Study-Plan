@@ -6,13 +6,104 @@ import 'package:tlustudy_planner/services/database_helper.dart';
 import 'package:tlustudy_planner/services/log_service.dart';
 import 'package:tlustudy_planner/utils/notification_helper.dart';
 class ExamProvider with ChangeNotifier {
-  final AuthService _authService = AuthService();
-  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
-  final _log = LogService();
-
   List<RegisterPeriod> _registerPeriods = [];
   List<Semester> _availableSemesters = [];
   List<StudentExamRoom> _examRooms = [];
+  ExamProvider({AuthService? authService, DatabaseHelper? database})
+    : _authService = authService ?? AuthService(),
+      _dbHelper = database ?? DatabaseHelper.instance;
+
+  final AuthService _authService;
+  final DatabaseHelper _dbHelper;
+  final _log = LogService();
+
+  List<StudentExamRoom> _timetableExams = [];
+  List<StudentExamRoom> get timetableExams =>
+      List.unmodifiable(_timetableExams);
+  bool _isLoadingTimetable = false;
+  bool get isLoadingTimetable => _isLoadingTimetable;
+  int _timetableGeneration = 0;
+  int? _timetableSemester;
+  Future<void>? _timetableRequest;
+
+  /// Read cached exams immediately; refresh every period and round for this semester.
+  Future<void> loadTimetable(
+    String? token,
+    int semesterId, {
+    bool force = false,
+  }) {
+    if (!force &&
+        _timetableSemester == semesterId &&
+        _timetableRequest != null) {
+      return _timetableRequest!;
+    }
+    _timetableSemester = semesterId;
+    final generation = ++_timetableGeneration;
+    return _timetableRequest = _loadTimetable(token, semesterId, generation);
+  }
+
+  Future<void> _reloadTimetableCache(int generation) async {
+    final exams = await _dbHelper.getTimetableExams();
+    if (generation != _timetableGeneration) return;
+    _timetableExams = exams;
+    notifyListeners();
+  }
+
+  Future<void> _loadTimetable(
+    String? token,
+    int semesterId,
+    int generation,
+  ) async {
+    _isLoadingTimetable = true;
+    notifyListeners();
+    try {
+      await _reloadTimetableCache(generation);
+      if (token == null || token.isEmpty || generation != _timetableGeneration)
+        return;
+      var periods = await _dbHelper.getRegisterPeriods(semesterId);
+      try {
+        periods = await _authService.getRegisterPeriods(token, semesterId);
+        if (generation != _timetableGeneration) return;
+        await _dbHelper.saveRegisterPeriods(semesterId, periods);
+      } catch (_) {
+        /* Keep the cached periods when offline. */
+      }
+      final tasks = <Future<void> Function()>[
+        for (final period in periods)
+          for (final round in _examRounds)
+            () async {
+              if (generation != _timetableGeneration) return;
+              try {
+                final rooms = await _authService.getStudentExamRooms(
+                  token,
+                  semesterId,
+                  period.id,
+                  round,
+                );
+                if (generation != _timetableGeneration) return;
+                await _dbHelper.saveExamRooms(
+                  semesterId,
+                  period.id,
+                  round,
+                  rooms,
+                );
+              } catch (_) {
+                /* Keep this filter's cached exams. */
+              }
+            },
+      ];
+      await _runPool(tasks);
+      await _reloadTimetableCache(generation);
+    } catch (e) {
+      _log.log('Timetable exam refresh failed: $e', level: LogLevel.warning);
+    } finally {
+      if (generation == _timetableGeneration) {
+        _isLoadingTimetable = false;
+        notifyListeners();
+      }
+    }
+  }
+
   bool _isLoading = false;
   bool _isLoadingSemesters = false;
   bool _isLoadingRooms = false;
@@ -289,6 +380,7 @@ class ExamProvider with ChangeNotifier {
     _log.log('Current semester ID: $currentSemesterId', level: LogLevel.debug);
 
     try {
+      await _reloadTimetableCache(_timetableGeneration);
       if (await _dbHelper.isCacheComplete()) {
         _log.log('Cache already complete - nothing to do', level: LogLevel.success);
         _isPreCaching = false;
@@ -478,6 +570,7 @@ class ExamProvider with ChangeNotifier {
       _isPreCaching = false;
       _preCacheProgress = 100;
       _preCacheCurrentSemester = _preCacheTotalSemesters;
+      await _reloadTimetableCache(_timetableGeneration);
       _preCacheStatus = 'Hoàn tất! Ứng dụng có thể hoạt động offline';
       notifyListeners();
     } catch (e) {
@@ -888,6 +981,7 @@ class ExamProvider with ChangeNotifier {
         examRound,
         rooms, // Save the fetched data, not _examRooms
       );
+      await _reloadTimetableCache(_timetableGeneration);
     } catch (e) {
       _log.log('_fetchExamRoomDetailsFromApi ERROR: $e', level: LogLevel.error);
       // Check if this is a 401 error (token expired) - completely silent
@@ -911,6 +1005,11 @@ class ExamProvider with ChangeNotifier {
 
   /// Clear all data
   void clear() {
+    _timetableGeneration++;
+    _isLoadingTimetable = false;
+    _timetableSemester = null;
+    _timetableRequest = null;
+    _timetableExams = [];
     _registerPeriods = [];
     _examRooms = [];
     _selectedRegisterPeriodId = null;

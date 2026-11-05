@@ -1,4 +1,4 @@
-/// A single current-conditions reading from OpenWeatherMap.
+/// A single current-conditions reading from WeatherAPI.com.
 class WeatherInfo {
   final String city;
   final String condition; // "Clear", "Rain", ...
@@ -8,6 +8,7 @@ class WeatherInfo {
   final int humidity;
   final double windSpeed;
   final DateTime observedAt;
+  final bool? isDay;
 
   /// True when the reading was taken from the device's own GPS position
   /// rather than the fallback coordinates.
@@ -22,37 +23,66 @@ class WeatherInfo {
     required this.humidity,
     required this.windSpeed,
     required this.observedAt,
+    this.isDay,
     this.fromDeviceLocation = false,
   });
 
-  factory WeatherInfo.fromOpenWeather(
+  factory WeatherInfo.fromWeatherApi(
     Map<String, dynamic> json, {
     bool fromDeviceLocation = false,
   }) {
-    final weather = (json['weather'] as List?)?.cast<Map<String, dynamic>>();
-    final mainWeather = (weather != null && weather.isNotEmpty)
-        ? weather.first
-        : null;
-    final main = (json['main'] as Map?)?.cast<String, dynamic>() ?? {};
-    final wind = (json['wind'] as Map?)?.cast<String, dynamic>() ?? {};
-    final dt = json['dt'] is int
-        ? DateTime.fromMillisecondsSinceEpoch((json['dt'] as int) * 1000)
-        : DateTime.now();
+    final location = json['location'] as Map<String, dynamic>;
+    final current = json['current'] as Map<String, dynamic>;
+    final condition = current['condition'] as Map<String, dynamic>;
+    final code = (condition['code'] as num).toInt();
+    // Numeric codes are independent of the selected response language.
+    final category = switch (code) {
+      1000 => 'Clear',
+      1003 || 1006 || 1009 => 'Cloud',
+      1030 || 1135 || 1147 => 'Mist',
+      1087 || 1273 || 1276 || 1279 || 1282 => 'Thunder',
+      1066 ||
+      1069 ||
+      1072 ||
+      1114 ||
+      1117 ||
+      1168 ||
+      1171 ||
+      1204 ||
+      1207 ||
+      1210 ||
+      1213 ||
+      1216 ||
+      1219 ||
+      1222 ||
+      1225 ||
+      1237 ||
+      1249 ||
+      1252 ||
+      1255 ||
+      1258 ||
+      1261 ||
+      1264 => 'Snow',
+      _ => 'Rain',
+    };
 
     return WeatherInfo(
-      city: (json['name'] ?? 'Vị trí hiện tại').toString(),
-      condition: (mainWeather?['main'] ?? 'Clear').toString(),
-      description: (mainWeather?['description'] ?? '').toString(),
-      temperature: (main['temp'] as num?)?.toDouble() ?? 0,
-      feelsLike: (main['feels_like'] as num?)?.toDouble() ?? 0,
-      humidity: (main['humidity'] as num?)?.round() ?? 0,
-      windSpeed: (wind['speed'] as num?)?.toDouble() ?? 0,
-      observedAt: dt,
+      city: location['name'].toString(),
+      condition: category,
+      description: condition['text'].toString(),
+      temperature: (current['temp_c'] as num).toDouble(),
+      feelsLike: (current['feelslike_c'] as num).toDouble(),
+      humidity: (current['humidity'] as num).round(),
+      windSpeed: (current['wind_kph'] as num).toDouble() / 3.6,
+      observedAt: DateTime.fromMillisecondsSinceEpoch(
+        (current['last_updated_epoch'] as num).toInt() * 1000,
+      ),
+      isDay: current['is_day'] == 1,
       fromDeviceLocation: fromDeviceLocation,
     );
   }
 
-  /// Maps the raw OpenWeather condition onto the illustration we paint.
+  /// Maps the condition category onto the illustration we paint.
   WeatherVisual get visual {
     final key = condition.toLowerCase();
     if (key.contains('rain') || key.contains('drizzle')) {
@@ -73,6 +103,7 @@ class WeatherInfo {
 
   /// Night-time readings get a darker palette even under a clear sky.
   bool get isNight {
+    if (isDay != null) return !isDay!;
     final h = observedAt.hour;
     return h >= 18 || h < 6;
   }

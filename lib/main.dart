@@ -96,9 +96,7 @@ void main() async {
         ChangeNotifierProvider.value(value: mailProvider),
         // Đăng ký học phần dựa vào phiên đăng nhập của UserProvider để
         // lấy token và mã sinh viên, nên nhận thẳng instance đó.
-        ChangeNotifierProvider(
-          create: (_) => EnrollmentProvider(userProvider),
-        ),
+        ChangeNotifierProvider(create: (_) => EnrollmentProvider(userProvider)),
       ],
       child: const MyApp(),
     ),
@@ -114,8 +112,8 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, localeProvider, _) {
         return MaterialApp(
           title: 'TLU Study Planner',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
+          theme: AppTheme.light(themeProvider.glassTransparency),
+          darkTheme: AppTheme.dark(themeProvider.glassTransparency),
           themeMode: themeProvider.themeMode,
           locale: localeProvider.locale,
           supportedLocales: const [Locale('vi'), Locale('en')],

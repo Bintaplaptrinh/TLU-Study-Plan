@@ -23,21 +23,14 @@ Widget _wrap(Widget child, {Brightness brightness = Brightness.light}) {
 }
 
 void main() {
-  testWidgets('"Đơn từ" hiện thẻ Phân hiệu và mở được trang ba bước', (
-    tester,
-  ) async {
+  testWidgets('Đơn từ is locked and cannot open the retired submission flow', (tester) async {
     await tester.pumpWidget(_wrap(const DocumentsScreen()));
     await tester.pump();
-
     expect(find.text('Đơn từ'), findsOneWidget);
-    expect(find.text('Phân hiệu trường Đại học Thủy Lợi'), findsOneWidget);
-
-    await tester.tap(find.text('Phân hiệu trường Đại học Thủy Lợi'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Tạo đơn'), findsOneWidget);
-    expect(find.text('Ghi danh nộp đơn'), findsOneWidget);
-    expect(find.text('Kiểm tra tình trạng đơn'), findsOneWidget);
+    expect(find.text('Đơn từ tạm khóa'), findsOneWidget);
+    expect(find.byIcon(Icons.lock_rounded), findsOneWidget);
+    expect(find.text('Phân hiệu trường Đại học Thủy Lợi'), findsNothing);
+    expect(find.byType(DocumentBranchScreen), findsNothing);
   });
 
   testWidgets('ba mục xếp đúng thứ tự bước 1 - 2 - 3', (tester) async {

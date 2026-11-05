@@ -111,7 +111,7 @@ void main() {
   group('Thời tiết khi thiếu khoá', () {
     test('báo lỗi rõ ràng thay vì gọi mạng', () async {
       // Chỉ có nghĩa khi chạy test không kèm --dart-define; có khoá thì bỏ qua.
-      if (AppSecrets.hasOpenWeatherKey) return;
+      if (AppSecrets.hasWeatherKey) return;
 
       await expectLater(
         WeatherService().loadCurrentWeather(),

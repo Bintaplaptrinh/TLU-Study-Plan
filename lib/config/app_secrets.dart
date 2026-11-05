@@ -26,11 +26,8 @@
 class AppSecrets {
   AppSecrets._();
 
-  /// Khoá OpenWeatherMap cho thẻ thời tiết ở Trang chủ.
-  /// Lấy miễn phí tại <https://home.openweathermap.org/api_keys>.
-  static const String openWeatherApiKey = String.fromEnvironment(
-    'OPENWEATHER_API_KEY',
-  );
+  /// WeatherAPI.com key, supplied by the local build environment.
+  static const String weatherApiKey = String.fromEnvironment('WEATHER_API_KEY');
 
-  static bool get hasOpenWeatherKey => openWeatherApiKey.isNotEmpty;
+  static bool get hasWeatherKey => weatherApiKey.isNotEmpty;
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tlustudy_planner/widgets/notice_list.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 
@@ -22,7 +23,10 @@ enum NoticeGroup { announcements, mail }
 /// Mở từ biểu tượng chuông ở Trang chủ, bằng Navigator lồng của khung tab -
 /// nhờ vậy thanh điều hướng vẫn nằm trên và tự thu thành nút back.
 class NoticeScreen extends StatefulWidget {
-  const NoticeScreen({super.key, this.initialGroup = NoticeGroup.mail});
+  const NoticeScreen({
+    super.key,
+    this.initialGroup = NoticeGroup.announcements,
+  });
 
   final NoticeGroup initialGroup;
 
@@ -92,30 +96,13 @@ class _NoticeScreenState extends State<NoticeScreen> {
               ),
             ),
             Expanded(
-              child: _group == NoticeGroup.announcements
-                  ? const _ComingSoonView()
-                  : const _MailListView(),
+              child: IndexedStack(
+                index: _group == NoticeGroup.announcements ? 0 : 1,
+                children: const [NoticeList(), _MailListView()],
+              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Nhóm "Thông báo" - chưa có nguồn dữ liệu nào từ trường, nên nói thẳng.
-class _ComingSoonView extends StatelessWidget {
-  const _ComingSoonView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: FloatingNavBar.bottomInset(context)),
-      child: const EmptyStateWidget(
-        icon: Symbols.construction_rounded,
-        title: 'Đang phát triển',
-        description:
-            'Thông báo từ nhà trường sẽ xuất hiện ở đây trong bản cập nhật tới.',
       ),
     );
   }
@@ -148,9 +135,9 @@ class _MailListView extends StatelessWidget {
                         final ok = await mail.link();
                         if (!context.mounted) return;
                         if (!ok && mail.error != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(mail.error!)),
-                          );
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(mail.error!)));
                         }
                       },
                 icon: mail.isLinking
@@ -183,8 +170,11 @@ class _MailListView extends StatelessWidget {
                   icon: mail.error != null
                       ? Symbols.error_rounded
                       : Symbols.inbox_rounded,
-                  title: mail.error != null ? 'Không tải được thư' : 'Hộp thư trống',
-                  description: mail.error ?? 'Chưa có thư nào trong hộp thư đến.',
+                  title: mail.error != null
+                      ? 'Không tải được thư'
+                      : 'Hộp thư trống',
+                  description:
+                      mail.error ?? 'Chưa có thư nào trong hộp thư đến.',
                 ),
               ],
             ),
@@ -269,8 +259,9 @@ class MailCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 13.5,
-                              fontWeight:
-                                  unread ? FontWeight.w800 : FontWeight.w600,
+                              fontWeight: unread
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
                               color: unread
                                   ? AppColors.text(context)
                                   : AppColors.textSoft(context),
@@ -296,8 +287,7 @@ class MailCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.25,
-                        fontWeight:
-                            unread ? FontWeight.w800 : FontWeight.w600,
+                        fontWeight: unread ? FontWeight.w800 : FontWeight.w600,
                         letterSpacing: -0.2,
                         color: AppColors.text(context),
                       ),

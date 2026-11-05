@@ -60,8 +60,10 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
 
     // Always try to load data, whether from cache or API
     // Check if we have cached data first
-    final hasCache = await examProvider.hasRegisterPeriodsCache(selectedSemester.id);
-    
+    final hasCache = await examProvider.hasRegisterPeriodsCache(
+      selectedSemester.id,
+    );
+
     if (hasCache) {
       // Load from cache without API call
       await examProvider.selectSemesterFromCache(selectedSemester.id);
@@ -82,7 +84,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
         if (_lastLoginState != userProvider.isLoggedIn) {
           _lastLoginState = userProvider.isLoggedIn;
           _hasInitialized = false;
-          
+
           // Schedule initialization for after the build completes
           if (userProvider.isLoggedIn && !_hasInitialized) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -94,7 +96,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             });
           }
         }
-        
+
         if (!userProvider.isLoggedIn) {
           return _buildNotLoggedIn();
         }
@@ -262,12 +264,8 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                                 period.name,
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ),
                           )
@@ -316,12 +314,8 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                               value: round,
                               child: TrText(
                                 'Lần $round',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ),
                           )
@@ -426,20 +420,20 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                 Icon(
                   Icons.event_busy,
                   size: 64,
-                  color: Theme.of(context).colorScheme.outline,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(height: 16),
                 TrText(
                   'Chưa có thông tin phòng thi',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
                 TrText(
                   'Vui lòng chọn đợt học và lần thi',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -523,7 +517,9 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                             'Số báo danh: ${examRoom.examCode}',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                           ),
                       ],
@@ -572,7 +568,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                   child: TrText(
                     'Chưa có thông tin phòng thi',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -603,14 +599,18 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                 TrText(
                   label,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                TrText(
-                  value,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: TrText(
+                    value,
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -630,7 +630,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             Icon(
               Icons.lock_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.outline,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             TrText(
@@ -641,7 +641,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             TrText(
               'Vui lòng đăng nhập để xem lịch thi',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -661,7 +661,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             Icon(
               Icons.event_busy,
               size: 64,
-              color: Theme.of(context).colorScheme.outline,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             TrText(
@@ -672,7 +672,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             TrText(
               'Vui lòng chọn học kỳ trong cài đặt',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -707,7 +707,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             TrText(
               error,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -733,7 +733,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             Icon(
               Icons.event_available,
               size: 64,
-              color: Theme.of(context).colorScheme.outline,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             TrText(
@@ -744,7 +744,7 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
             TrText(
               'Chưa có lịch thi nào được công bố cho học kỳ này',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),

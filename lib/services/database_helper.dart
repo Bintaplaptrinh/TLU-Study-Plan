@@ -555,11 +555,7 @@ class DatabaseHelper {
     return jsonEncode(
       periods
           .map(
-            (p) => {
-              'id': p.id,
-              'name': p.name,
-              'displayOrder': p.displayOrder,
-            },
+            (p) => {'id': p.id, 'name': p.name, 'displayOrder': p.displayOrder},
           )
           .toList(),
     );
@@ -1053,6 +1049,18 @@ class DatabaseHelper {
       orderBy: 'examDate, examDateString',
     );
 
+    return _decodeExamRooms(maps);
+  }
+
+  /// All cached filters feed the calendar, independent of the exam tab's filter.
+  Future<List<StudentExamRoom>> getTimetableExams() async {
+    final db = await database;
+    return _decodeExamRooms(
+      await db.query('exam_rooms', orderBy: 'lastUpdated DESC'),
+    );
+  }
+
+  List<StudentExamRoom> _decodeExamRooms(List<Map<String, Object?>> maps) {
     return maps.map((map) {
       ExamHour? examHour;
       if (map['examHourJson'] != null) {
@@ -1077,7 +1085,9 @@ class DatabaseHelper {
       }
 
       ExamRoomDetail? examRoomDetail;
-      if (map['roomCode'] != null && (map['roomCode'] as String).isNotEmpty) {
+      if (map['roomCode'] != null ||
+          map['examDate'] != null ||
+          map['examDateString'] != null) {
         examRoomDetail = ExamRoomDetail(
           id: 0,
           roomCode: map['roomCode'] as String,
@@ -1102,7 +1112,7 @@ class DatabaseHelper {
         examPeriodCode: map['examPeriodCode'] as String,
         subjectName: map['subjectName'] as String,
         studentCode: map['studentCode'] as String?,
-        examRound: examRound,
+        examRound: map['examRound'] as int?,
         examRoom: examRoomDetail,
       );
     }).toList();

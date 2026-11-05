@@ -1,7 +1,7 @@
 name: tlustudy_planner
 description: "TLU Study Planner for TLU students"
 publish_to: 'none'
-version: 2.2.1
+version: 3.0.0
 
 environment:
   sdk: ^3.9.2
@@ -14,6 +14,7 @@ dependencies:
   provider: ^6.1.5+1
   shared_preferences: ^2.5.5
   http: ^1.5.0
+  html: ^0.15.6
   dio: ^5.11.0
   sqflite: ^2.4.2
   path: ^1.9.1
@@ -30,7 +31,7 @@ dependencies:
   geolocator: ^14.0.3  # Device location for the weather card
   translator: ^1.0.4+1  # On-the-fly vi/en translation
   flutter_secure_storage: ^11.0.0  # Keystore/Keychain for the login credentials
-  webview_flutter: ^4.14.1  # Full-screen Google Form inside "Đơn từ"
+  webview_flutter: ^4.14.1  # Fullscreen university notice articles and forms
   flutter_appauth: ^12.1.0  # OAuth 2.0 + PKCE cho hộp thư trường (Microsoft Graph)
   path_provider: ^2.1.5  # Thư mục tạm để lưu tệp đính kèm đã tải
   open_filex: ^4.7.0  # Mở tệp đính kèm bằng ứng dụng của hệ thống

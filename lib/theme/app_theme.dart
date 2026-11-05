@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'package:tlustudy_planner/theme/app_colors.dart';
+import 'glass_appearance.dart';
+import '../widgets/glass_surface.dart';
 
 /// App-wide Material 3 themes built on top of [AppColors].
 ///
@@ -18,19 +20,28 @@ class AppTheme {
 
   static ThemeData get lightTheme => _build(Brightness.light);
   static ThemeData get darkTheme => _build(Brightness.dark);
+  static ThemeData light(double transparency) =>
+      _build(Brightness.light, transparency);
+  static ThemeData dark(double transparency) =>
+      _build(Brightness.dark, transparency);
 
-  static ThemeData _build(Brightness brightness) {
+  static ThemeData _build(Brightness brightness, [double transparency = 0.5]) {
     final isDark = brightness == Brightness.dark;
 
     final Color bg = isDark ? const Color(0xFF0A0E17) : const Color(0xFFF4F7FC);
     final Color surface = isDark ? const Color(0xFF121826) : Colors.white;
-    final Color surfaceAlt =
-        isDark ? const Color(0xFF19212F) : const Color(0xFFF7FAFF);
-    final Color border =
-        isDark ? const Color(0xFF232C3D) : const Color(0xFFE3EAF5);
-    final Color text = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
-    final Color textSoft =
-        isDark ? const Color(0xFFB6C2D4) : const Color(0xFF475569);
+    final Color surfaceAlt = isDark
+        ? const Color(0xFF19212F)
+        : const Color(0xFFF7FAFF);
+    final Color border = isDark
+        ? const Color(0xFF232C3D)
+        : const Color(0xFFE3EAF5);
+    final Color text = isDark
+        ? const Color(0xFFF1F5F9)
+        : const Color(0xFF0F172A);
+    final Color textSoft = isDark
+        ? const Color(0xFFB6C2D4)
+        : const Color(0xFF475569);
     final Color accent = isDark ? AppColors.blue400 : AppColors.blue600;
     final Color onAccent = isDark ? const Color(0xFF08111F) : Colors.white;
 
@@ -50,18 +61,21 @@ class AppTheme {
       onTertiary: onAccent,
       error: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
       onError: Colors.white,
-      errorContainer:
-          isDark ? const Color(0xFF3F1212) : const Color(0xFFFEE2E2),
-      onErrorContainer:
-          isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+      errorContainer: isDark
+          ? const Color(0xFF3F1212)
+          : const Color(0xFFFEE2E2),
+      onErrorContainer: isDark
+          ? const Color(0xFFFCA5A5)
+          : const Color(0xFFB91C1C),
       surface: surface,
       onSurface: text,
       surfaceContainerLowest: isDark ? const Color(0xFF0D1220) : Colors.white,
       surfaceContainerLow: isDark ? const Color(0xFF111827) : surfaceAlt,
       surfaceContainer: isDark ? const Color(0xFF151D2C) : surfaceAlt,
       surfaceContainerHigh: isDark ? const Color(0xFF19212F) : bg,
-      surfaceContainerHighest:
-          isDark ? const Color(0xFF1E273A) : const Color(0xFFEDF2FA),
+      surfaceContainerHighest: isDark
+          ? const Color(0xFF1E273A)
+          : const Color(0xFFEDF2FA),
       onSurfaceVariant: textSoft,
       outline: border,
       outlineVariant: border,
@@ -73,6 +87,7 @@ class AppTheme {
     );
 
     return base.copyWith(
+      extensions: [GlassAppearance(transparency: transparency)],
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
       canvasColor: bg,
@@ -122,39 +137,63 @@ class AppTheme {
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: accent,
-          foregroundColor: onAccent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-        ),
+        style:
+            FilledButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: transparency < .65 ? onAccent : text,
+              elevation: 0,
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ).copyWith(
+              backgroundBuilder: (context, states, child) => GlassSurface(
+                radius: 28,
+                tint: states.contains(WidgetState.disabled) ? null : accent,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accent,
-          foregroundColor: onAccent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-        ),
+        style:
+            ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: transparency < .65 ? onAccent : text,
+              elevation: 0,
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ).copyWith(
+              backgroundBuilder: (context, states, child) => GlassSurface(
+                radius: 28,
+                tint: states.contains(WidgetState.disabled) ? null : accent,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: text,
-          side: BorderSide(color: border, width: 1.2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-        ),
+        style:
+            OutlinedButton.styleFrom(
+              foregroundColor: text,
+              side: BorderSide(color: border, width: 1.2),
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ).copyWith(
+              backgroundBuilder: (context, states, child) => GlassSurface(
+                radius: 28,
+                tint: null,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
@@ -162,6 +201,25 @@ class AppTheme {
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style:
+            IconButton.styleFrom(
+              shape: const CircleBorder(),
+              foregroundColor: text,
+            ).copyWith(
+              backgroundBuilder: (context, states, child) => GlassSurface(
+                radius: 999,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: (isDark ? const Color(0xFF2D3544) : Colors.white).withValues(
+          alpha: GlassAppearance(transparency: transparency).alpha(.76),
+        ),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: accent,
@@ -214,7 +272,10 @@ class AppTheme {
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: surfaceAlt,
+        backgroundColor: (isDark ? const Color(0xFF212A39) : Colors.white)
+            .withValues(
+              alpha: GlassAppearance(transparency: transparency).alpha(.44),
+            ),
         selectedColor: isDark ? const Color(0xFF16233E) : AppColors.blue50,
         side: BorderSide(color: border),
         labelStyle: TextStyle(
@@ -231,8 +292,10 @@ class AppTheme {
         filled: true,
         fillColor: isDark ? surfaceAlt : Colors.white,
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 16,
+        ),
         hintStyle: TextStyle(color: textSoft.withValues(alpha: 0.8)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -258,7 +321,9 @@ class AppTheme {
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? const Color(0xFF1E273A) : const Color(0xFF0F172A),
+        backgroundColor: isDark
+            ? const Color(0xFF1E273A)
+            : const Color(0xFF0F172A),
         contentTextStyle: const TextStyle(color: Colors.white),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(

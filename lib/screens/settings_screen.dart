@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:tlustudy_planner/widgets/glass_surface.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:android_intent_plus/android_intent.dart';
@@ -24,6 +25,42 @@ import 'package:tlustudy_planner/widgets/update_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  Widget _buildGlassCard(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: Consumer<ThemeProvider>(
+      builder: (context, theme, _) => GlassSurface(
+        radius: 28,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const TrText(
+              'Liquid Glass',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Expanded(child: TrText('Độ trong suốt của kính')),
+                Text('${(theme.glassTransparency * 100).round()}%'),
+              ],
+            ),
+            Slider(
+              value: theme.glassTransparency,
+              label: '${(theme.glassTransparency * 100).round()}%',
+              divisions: 20,
+              onChanged: theme.setGlassTransparency,
+            ),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [TrText('Đục'), TrText('Trong suốt')],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -911,6 +948,7 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
         ),
+        SliverToBoxAdapter(child: _buildGlassCard(context)),
         SliverToBoxAdapter(child: _buildLanguageCard(context)),
         SliverToBoxAdapter(
           child: Padding(

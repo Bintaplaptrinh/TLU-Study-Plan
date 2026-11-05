@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:tlustudy_planner/config/app_secrets.dart';
 import 'package:tlustudy_planner/models/weather_info.dart';
 
-/// Loads current conditions from OpenWeatherMap.
+/// Loads current conditions from WeatherAPI.com.
 ///
 /// Tries the device's GPS position first; if location is denied, disabled or
 /// simply too slow, it falls back to fixed Ho Chi Minh City coordinates so the
@@ -14,10 +14,9 @@ import 'package:tlustudy_planner/models/weather_info.dart';
 class WeatherService {
   /// Khoá đến từ `--dart-define-from-file=env.json`, không nằm trong mã nguồn.
   /// Xem `lib/config/app_secrets.dart`.
-  static const String _apiKey = AppSecrets.openWeatherApiKey;
+  static const String _apiKey = AppSecrets.weatherApiKey;
 
-  static const String _endpoint =
-      'https://api.openweathermap.org/data/2.5/weather';
+  static const String _endpoint = 'https://api.weatherapi.com/v1/current.json';
 
   /// Ho Chi Minh City — used whenever the device position is unavailable.
   static const double fallbackLat = 10.792807392341823;
@@ -33,7 +32,7 @@ class WeatherService {
   static String? _cachedLang;
   static const Duration _cacheTtl = Duration(minutes: 10);
 
-  /// [lang] is the app's active language ('vi' or 'en'); OpenWeather returns
+  /// [lang] is the app's active language ('vi' or 'en'); WeatherAPI returns
   /// the description and city name already localised, so the card needs no
   /// further translation.
   Future<WeatherInfo> loadCurrentWeather({
@@ -41,7 +40,7 @@ class WeatherService {
     String lang = 'vi',
   }) async {
     // Chặn ngay từ đầu: không có khoá thì mọi bước sau (xin quyền vị trí, gọi
-    // mạng) đều vô ích, và OpenWeather trả 401 với thông điệp tiếng Anh mà
+    // mạng) đều vô ích, và API trả 401 với thông điệp tiếng Anh mà
     // người dùng không hiểu.
     if (_apiKey.isEmpty) {
       throw const WeatherException(
@@ -61,8 +60,10 @@ class WeatherService {
 
     // Hard cap on the whole location step: if the permission dialog is left
     // unanswered we still show weather for the fallback coordinates.
-    final position = await _tryGetPosition()
-        .timeout(_locationBudget, onTimeout: () => null);
+    final position = await _tryGetPosition().timeout(
+      _locationBudget,
+      onTimeout: () => null,
+    );
     final info = await _fetch(
       lat: position?.latitude ?? fallbackLat,
       lon: position?.longitude ?? fallbackLon,
@@ -84,16 +85,15 @@ class WeatherService {
   }) async {
     final uri = Uri.parse(_endpoint).replace(
       queryParameters: {
-        'lat': lat.toString(),
-        'lon': lon.toString(),
-        'appid': _apiKey,
-        'units': 'metric',
+        'q': '$lat,$lon',
+        'key': _apiKey,
+        'aqi': 'no',
         'lang': lang,
       },
     );
 
     final response = await http.get(uri).timeout(_requestTimeout);
-    if (response.statusCode == 401) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
       // Khoá sai hoặc đã bị thu hồi - tách riêng để khỏi lẫn với lỗi mạng.
       throw const WeatherException('Khoá thời tiết không hợp lệ.');
     }
@@ -101,7 +101,7 @@ class WeatherService {
       throw const WeatherException('Không tải được thời tiết hôm nay.');
     }
 
-    return WeatherInfo.fromOpenWeather(
+    return WeatherInfo.fromWeatherApi(
       jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>,
       fromDeviceLocation: fromDeviceLocation,
     );

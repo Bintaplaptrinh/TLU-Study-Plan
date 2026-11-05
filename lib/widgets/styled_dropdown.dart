@@ -1,14 +1,15 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:tlustudy_planner/i18n/tr_text.dart';
+import 'package:tlustudy_planner/theme/app_colors.dart';
+import 'glass_surface.dart';
 
+/// Closed control and open menu share the source project's frosted material.
 class StyledDropdownButton<T> extends StatelessWidget {
   final T? value;
   final List<DropdownMenuItem<T>> items;
   final ValueChanged<T?>? onChanged;
   final bool isExpanded;
   final String? hint;
-
   const StyledDropdownButton({
     super.key,
     required this.value,
@@ -18,48 +19,72 @@ class StyledDropdownButton<T> extends StatelessWidget {
     this.hint,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-
-        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-
-            color: colorScheme.surface.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.5),
-              width: 1,
+  Future<void> _open(BuildContext context) async {
+    final selected = await showDialog<T>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .12),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: GlassSurface(
+          radius: 28,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(8),
+              children: [
+                for (final item in items)
+                  ListTile(
+                    enabled: item.enabled,
+                    selected: item.value == value,
+                    selectedTileColor: AppColors.glassSelected(context),
+                    textColor: AppColors.text(context),
+                    trailing: item.value == value
+                        ? const Icon(Icons.check_rounded)
+                        : null,
+                    title: item.child,
+                    onTap: item.enabled
+                        ? () => Navigator.pop(context, item.value)
+                        : null,
+                  ),
+              ],
             ),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              value: value,
-              isExpanded: isExpanded,
-              hint: hint != null ? TrText(hint!) : null,
-              icon: Icon(
-                Icons.arrow_drop_down_rounded,
-                color: colorScheme.primary,
-              ),
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
+        ),
+      ),
+    );
+    if (selected != null) onChanged?.call(selected);
+  }
 
-              dropdownColor: colorScheme.surface.withOpacity(
-                0.9,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              items: items,
-              onChanged: onChanged,
-              menuMaxHeight: 400,
+  @override
+  Widget build(BuildContext context) {
+    final selected = items.where((item) => item.value == value).firstOrNull;
+    final label = selected?.child ?? TrText(hint ?? 'Chọn');
+    return GlassSurface(
+      radius: 28,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: onChanged == null || items.isEmpty
+              ? null
+              : () => _open(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: Row(
+              mainAxisSize: isExpanded ? MainAxisSize.max : MainAxisSize.min,
+              children: [
+                if (isExpanded)
+                  Expanded(child: label)
+                else
+                  Flexible(child: label),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.expand_more_rounded,
+                  color: AppColors.accent(context),
+                ),
+              ],
             ),
           ),
         ),
@@ -74,7 +99,6 @@ class StyledDropdownFormField<T> extends StatelessWidget {
   final ValueChanged<T?>? onChanged;
   final String? labelText;
   final bool isExpanded;
-
   const StyledDropdownFormField({
     super.key,
     required this.value,
@@ -83,83 +107,44 @@ class StyledDropdownFormField<T> extends StatelessWidget {
     this.labelText,
     this.isExpanded = true,
   });
-
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DropdownButtonFormField<T>(
-      value: value,
-      isExpanded: isExpanded,
-      decoration: InputDecoration(
-        labelText: labelText,
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHighest,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (labelText != null)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: TrText(
+            labelText!,
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
+      StyledDropdownButton<T>(
+        value: value,
+        items: items,
+        onChanged: onChanged,
+        isExpanded: isExpanded,
       ),
-      icon: Icon(Icons.arrow_drop_down_rounded, color: colorScheme.primary),
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-        color: colorScheme.onSurface,
-        fontWeight: FontWeight.w600,
-      ),
-      dropdownColor: colorScheme.surface,
-      borderRadius: BorderRadius.circular(16),
-      items: items,
-      onChanged: onChanged,
-      menuMaxHeight: 400,
-    );
-  }
+    ],
+  );
 }
 
-/// Glass blur backdrop for modals and overlays
 class GlassBlurBackdrop extends StatelessWidget {
   final Widget child;
-  final double sigmaX;
-  final double sigmaY;
+  final double sigmaX, sigmaY;
   final Color? backgroundColor;
-
   const GlassBlurBackdrop({
     super.key,
     required this.child,
-    this.sigmaX = 10.0,
-    this.sigmaY = 10.0,
+    this.sigmaX = 24,
+    this.sigmaY = 24,
     this.backgroundColor,
   });
-
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: sigmaX, sigmaY: sigmaY),
-        child: Container(
-          decoration: BoxDecoration(
-            color: backgroundColor ?? colorScheme.surface.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.5),
-              width: 1,
-            ),
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => GlassSurface(
+    radius: 28,
+    blur: (sigmaX + sigmaY) / 2,
+    tint: backgroundColor,
+    child: child,
+  );
 }
